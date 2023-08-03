@@ -1,23 +1,27 @@
 import os
 import json
-from dataclasses import dataclass, field
 
 from tqdm import tqdm
 import jellyfish
 
 
-@dataclass
-class PreprocessorSROIE:
-    processed_data: list = field(default_factory=list)
-    process_mode: str = 'train'
-    img_path: str = 'img/'
-    entities_path: str = 'entities/'
-    box_path: str = 'box/'
-    word_data: list = field(default_factory=list)
-    box_data: list = field(default_factory=list)
-    entities_data: list = field(default_factory=list)
+class PreprocessorSROIE():
+    def __init__(self,
+                 process_mode: str = 'train',
+                 img_path: str = 'img/',
+                 entities_path: str = 'entities/',
+                 box_path: str = 'box/'):
 
-    def __post_init__(self):
+        self.process_mode = process_mode
+        self.img_path = img_path
+        self.entities_path = entities_path
+        self.box_path = box_path
+
+        self.processed_data: list = []
+        self.word_data: list = []
+        self.box_data: list = []
+        self.entities_data: list = []
+
         if self.process_mode == 'train':
             self.base_path = '/home/ishan/vscode-workspace/receipt-data-extraction/data/train/'
         else:
@@ -86,21 +90,21 @@ class PreprocessorSROIE:
             self.get_processed_data(lines)
             if self.process_mode == 'train':
                 self.processed_data.append({
-                    'img': self.base_path+self.img_path+file+'.jpg',
-                    'box': self.box_data,
+                    'imgs': self.base_path+self.img_path+file+'.jpg',
+                    'boxes': self.box_data,
                     'words': self.word_data,
                     'labels': self.entities_data
                 })
             else:
                 self.processed_data.append({
-                    'img': self.base_path+self.img_path+file+'.jpg',
-                    'box': self.box_data,
+                    'imgs': self.base_path+self.img_path+file+'.jpg',
+                    'boxes': self.box_data,
                     'words': self.word_data,
                 })
             self.box_data = []
             self.word_data = []
             self.entities_data = []
-        # open('processed_data.json', 'w').write(json.dumps(self.processed_data))
+        open('processed_data.json', 'w').write(json.dumps(self.processed_data))
         return self.processed_data
 
 

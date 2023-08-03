@@ -10,6 +10,10 @@ packages = []
 python = "^3.9"
 tqdm = "^4.65.0"
 jellyfish = "^1.0.0"
+numpy = "^1.25.2"
+torch = "2.0.0"
+transformers = "^4.31.0"
+pillow = "^10.0.0"
 
 
 [build-system]
