@@ -2,9 +2,8 @@ import json
 import numpy as np
 import torch
 from PIL import Image
-import pickle
 
-from model import Model
+from model import Processor
 
 
 class ReceiptDataset(torch.utils.data.Dataset):
@@ -22,13 +21,14 @@ class ReceiptDataset(torch.utils.data.Dataset):
         self.id2label = id2label
         self.split_name = split_name
         self.max_length = max_length
-        model = Model(use_large=use_large)
-        self.processor = model.load_processor()
+        processor = Processor(use_large=use_large)
+        processor.load_processor()
+        self.processor = processor.processor
 
     def __len__(self):
         return len(self.annotations)
     
-    def preprocess_data(self, data):
+    def process_data(self, data):
         images = [Image.open(path).convert("RGB") for path in data['imgs']]
         words = data['words']
         boxes = data['boxes']
@@ -50,11 +50,7 @@ class ReceiptDataset(torch.utils.data.Dataset):
             return_overflowing_tokens=True,
             stride=self.stride,
         )
-        
-        with open('encoded_inputs.json', 'w') as f:
-            f.write(str(encoded_inputs))
-        
-        
+        print('#'*20)
         return encoded_inputs
 
     def __getitem__(self, idx):
@@ -69,17 +65,26 @@ class ReceiptDataset(torch.utils.data.Dataset):
             'image': torch.tensor([]).type(torch.LongTensor),
             'idx': torch.tensor([]).type(torch.LongTensor)
         }
-        processed_dict = {i:self.preprocess_data({k:[v] for k,v in self.annotations[i].items()}) for i in idx}
+
+        processed_dict = {i:self.process_data({k:[v] for k,v in self.annotations[i].items()}) for i in idx}
+        print(len(processed_dict), flush=True)
+        for idx, data in processed_dict.items():
+            for key in ret_obj:
+                ret_obj[key] = torch.cat([ret_obj[key], data[key]])
+
+        with open('model_inputs.json', 'w') as f:
+            json.dump(ret_obj, f)
+        
         return ret_obj
 
 class ReceiptDataLoader:
     def __init__(self,
-                data_path,
+                 data_path,
                  batch_size,
-                stride,
-                max_length,
-                train_fraction,
-                use_large
+                 stride,
+                 max_length,
+                 train_fraction,
+                 use_large
                  ):
         self.batch_size = batch_size
         self.stride = stride
@@ -87,15 +92,19 @@ class ReceiptDataLoader:
         self.train_fraction = train_fraction
         self.use_large = use_large
         self.annotations = json.loads(open(data_path, "r").read())
-        self.labels = []
-        for annot in self.annotations:
-            self.labels = list(set(self.labels + annot["labels"]))
+        self.labels = self.get_unique_labels()
         self.label2id = {v: k for k, v in enumerate(self.labels)}
         self.id2label = {k: v for k, v in enumerate(self.labels)}
         self.annotations = self.annotations[:10]
         self.train_annotations, self.test_annotations = self.get_train_test_split()
         self.train_dataset, self.test_dataset = self.get_dataset()
         self.train_dataloader, self.test_dataloader = self.get_dataloader()
+
+    def get_unique_labels(self):
+        labels = []
+        for annot in self.annotations:
+            labels = list(set(labels + annot["labels"]))
+        return labels
 
     def get_train_test_split(self):
         unique_docs = sorted(
@@ -153,4 +162,3 @@ class ReceiptDataLoader:
                                                     num_workers=4)
 
         return train_dataloader, test_dataloader
-

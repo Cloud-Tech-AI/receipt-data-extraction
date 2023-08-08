@@ -6,11 +6,10 @@ import argparse
 import torch
 
 from dataloader import ReceiptDataLoader
+from trainer import TrainCustomModel
 
 import logging
 logging.basicConfig(level=logging.INFO)
-
-
 
 
 if "__main__" == __name__:
@@ -23,6 +22,7 @@ if "__main__" == __name__:
     arg_parser.add_argument('--device', type=str, default='cuda:0', help='device (CPU, if CUDA not available)')
     arg_parser.add_argument('--use_large', default=False, action='store_true', help='use layoutlmv2-large-uncased as base model')
     arg_parser.add_argument('--save_all', action='store_true', help='')
+    arg_parser.add_argument('--concurrency', type=int, default=4, help='samples that model will process in parallel')
 
     arg_parser.add_argument('--batch_size', type=int, default=32, help='batch size')
     arg_parser.add_argument('--stride', type=int, default=50, help='stride across tokens in case of overflow')
@@ -45,13 +45,21 @@ if "__main__" == __name__:
         os.makedirs(os.path.join('artefacts', args.run_name), exist_ok=True)
         args.artefact_dir = os.path.join('artefacts', args.run_name)
     else:
-        os.makedirs(os.path.join(args.artefact_dir, args.run_name), exist_ok=True)
+        os.makedirs(os.path.join(args.artefact_dir,
+                    args.run_name), exist_ok=True)
         args.artefact_dir = os.path.join(args.artefact_dir, args.run_name)
-    
+
     # sys.stdout = open(os.path.join(args.artefact_dir, "layoutlm_log.log"), "a")
     # sys.stderr = open(os.path.join(args.artefact_dir, "layoutlm_err.log"), "a")
-    
-    dataloader = ReceiptDataLoader(args.data, args.batch_size, args.stride, args.max_length, args.train_fraction, args.use_large)
 
-    open(os.path.join(args.artefact_dir, "train_annotation.json"), "w").write(json.dumps(dataloader.train_annotations))
-    open(os.path.join(args.artefact_dir, "test_annotation.json"), "w").write(json.dumps(dataloader.test_annotations))
+    dataloader = ReceiptDataLoader(
+        args.data, args.batch_size, args.stride, args.max_length, args.train_fraction, args.use_large)
+
+    open(os.path.join(args.artefact_dir, "train_annotation.json"),
+         "w").write(json.dumps(dataloader.train_annotations))
+    open(os.path.join(args.artefact_dir, "test_annotation.json"),
+         "w").write(json.dumps(dataloader.test_annotations))
+
+    trainer = TrainCustomModel(dataloader.train_annotations, dataloader.test_annotations, dataloader.labels,
+                               args.lr, args.epochs, args.dropout, args.clip_grad, args.early_stopping_patience)
+    trainer.train()
