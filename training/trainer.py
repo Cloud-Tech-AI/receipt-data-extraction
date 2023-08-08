@@ -63,6 +63,16 @@ class TrainCustomModel:
             "early_stopping_patience": self.early_stopping_patience
         }
         return config
+    
+    def cross_entropy_loss(self, logits, labels, attention_mask, size_average=True):
+        logits = logits.view(-1, logits.size(-1))
+        labels = labels.view(-1)
+        loss = torch.nn.functional.cross_entropy(logits, labels, reduction='none', label_smoothing=0.1)
+        if attention_mask is not None:
+            loss = loss * attention_mask.view(-1)
+        if size_average:
+            loss = loss.sum() / attention_mask.sum()
+        return loss
 
     def train(self):
         self.model_params.model.to(self.device)
@@ -114,11 +124,11 @@ class TrainCustomModel:
                     self.epoch_params.batch_labels.extend(batch['labels'].detach())
                     self.epoch_params.batch_attention.extend(batch['attention_mask'].detach())
 
-                loss = torch.nn.functional.cross_entropy(
-                        pred=outputs.logits,
-                        target=batch['labels'],
-                        attention_mask=batch['attention_mask']
-                    )
+                loss = self.cross_entropy_loss(
+                    logits=outputs.logits,
+                    labels=batch['labels'],
+                    attention_mask=batch['attention_mask']
+                )
                 loss.backward()
                 if self.clip_grad is not None:
                     torch.nn.utils.clip_grad_norm_(
@@ -181,9 +191,9 @@ class TrainCustomModel:
                         self.epoch_params.batch_labels.extend(batch['labels'].detach())
                         self.epoch_params.batch_attention.extend(batch['attention_mask'].detach())
             
-                    loss = torch.nn.functional.cross_entropy(
-                        pred=outputs.logits,
-                        target=batch['labels'],
+                    loss = self.cross_entropy_loss(
+                        logits=outputs.logits,
+                        labels=batch['labels'],
                         attention_mask=batch['attention_mask']
                     )
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
