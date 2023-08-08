@@ -50,7 +50,9 @@ class ReceiptDataset(torch.utils.data.Dataset):
             return_overflowing_tokens=True,
             stride=self.stride,
         )
-        print('#'*20)
+        if isinstance(encoded_inputs["image"], list):
+            encoded_inputs["image"] = torch.stack(encoded_inputs["image"]).repeat(1, 1, 1, 1)
+            
         return encoded_inputs
 
     def __getitem__(self, idx):
@@ -67,14 +69,15 @@ class ReceiptDataset(torch.utils.data.Dataset):
         }
 
         processed_dict = {i:self.process_data({k:[v] for k,v in self.annotations[i].items()}) for i in idx}
-        print(len(processed_dict), flush=True)
         for idx, data in processed_dict.items():
             for key in ret_obj:
+                if key == 'idx':
+                    ret_obj[key] = torch.cat([ret_obj[key], torch.tensor([idx])])
+                    continue
                 ret_obj[key] = torch.cat([ret_obj[key], data[key]])
+                if ret_obj[key].dtype == torch.float32:
+                    ret_obj[key] = ret_obj[key].type(torch.LongTensor)
 
-        with open('model_inputs.json', 'w') as f:
-            json.dump(ret_obj, f)
-        
         return ret_obj
 
 class ReceiptDataLoader:

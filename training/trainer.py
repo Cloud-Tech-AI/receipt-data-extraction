@@ -40,10 +40,9 @@ class TrainCustomModel:
         else:
             sample_groups = []
             for i in range(num_sample_groups):
-                empty_batch = {k: [] for k, v in sample_groups.items()}
+                empty_batch = {k: [] for k, v in batch.items()}
                 for k, v in empty_batch.items():
-                    empty_batch[k] = sample_groups[k][i *
-                                                      self.concurrency: i*self.concurrency + self.concurrency]
+                    empty_batch[k] = batch[k][i*self.concurrency: i*self.concurrency + self.concurrency]
                 sample_groups.append(empty_batch)
             return sample_groups
         
@@ -89,21 +88,21 @@ class TrainCustomModel:
                 self.epoch_params.reset_batch()
                 print("$"*40, flush=True)
                 print(
-                    f"BATCH START TIME: {str(self.epoch_params.batch_time)}\BATCH NUMBER: {batch_idx}", flush=True)
+                    f"BATCH START TIME: {str(self.epoch_params.batch_time)}\tBATCH NUMBER: {batch_idx}", flush=True)
                 
                 # zero the parameter gradients
                 self.model_params.optimizer.zero_grad()
-                sample_groups = self.group_samples(batch, self.concurrency)
+                sample_groups = self.group_samples(batch)
                 loss = None
                 # Take sub batches, accumulate gradients and loss
                 for group in sample_groups:
                     for k, v in group.items():
                         # remove unwanted index
-                        if k in ["original_path", "idx"]:
+                        if k in ["idx"]:
                             continue
                         # put on device
                         group[k] = v.to(self.device)
-
+                    del group["idx"]
                     # del _temp
                     # forward + backward + optimize
                     # group = torch.tensor(**group).to(torch.long64)
@@ -159,16 +158,17 @@ class TrainCustomModel:
             self.model_params.model.eval()
             for batch in self.dataloader.test_dataloader:
                 with torch.no_grad():
-                    sample_groups = self.group_samples(batch, self.concurrency)
+                    sample_groups = self.group_samples(batch)
                     loss = None
                     # Take sub batches, accumulate gradients and loss
                     for group in sample_groups:
                         for k, v in group.items():
                             # remove unwanted index
-                            if k in ["original_path", "idx"]:
+                            if k in ["idx"]:
                                 continue
                             # put on device
                             group[k] = v.to(self.device)
+                        del group["idx"]
 
                         # del _temp
                         # forward + backward + optimize
