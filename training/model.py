@@ -8,7 +8,7 @@ from mixins import TrainerMixin, TimeMixin
 
 
 class BaseClass:
-    def __init__(self, use_large=False):
+    def __init__(self, use_large):
         if use_large:
             self.model_name = "microsoft/layoutlmv2-large-uncased"
             self.processor_name = "microsoft/layoutlmv2-large-uncased"
@@ -18,7 +18,7 @@ class BaseClass:
 
 
 class Processor(BaseClass):
-    def __init__(self, use_large=False):
+    def __init__(self, use_large):
         super().__init__(use_large)
 
     def load_processor(self):
@@ -30,17 +30,19 @@ class Model(TrainerMixin, TimeMixin, BaseClass):
     def __init__(self,
                  dropout,
                  save_all,
-                 artifect_dir,
+                 artefact_dir,
                  learning_rate,
-                 use_large=False,
+                 use_large,
                  optimizer=None,
                  epoch_num=0,
                  model=None
                  ):
-        super().__init__(use_large)
+        TrainerMixin.__init__(self)
+        TimeMixin.__init__(self)
+        BaseClass.__init__(self, use_large)
         self.dropout = dropout
         self.save_all = save_all
-        self.artifect_dir = artifect_dir
+        self.artefact_dir = artefact_dir
         self.learning_rate = learning_rate
         self.optimizer = optimizer
         self.epoch_num = epoch_num
@@ -52,7 +54,7 @@ class Model(TrainerMixin, TimeMixin, BaseClass):
         )
         self.optimizer = AdamW(self.model.parameters(), lr=self.learning_rate)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.model.optimizer, 'min', verbose=True, patience=5)
+            self.optimizer, 'min', verbose=True, patience=5)
         self.epoch_num = 0
         self.train_metric = load_metric("seqeval")
         self.eval_metric = load_metric("seqeval")

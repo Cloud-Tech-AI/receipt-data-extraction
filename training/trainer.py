@@ -22,14 +22,13 @@ class TrainCustomModel:
                  ):
         self.dataloader = dataloader
         self.concurrency = concurrency
-        self.learning_rate = learning_rate
         self.epochs = epochs
         self.clip_grad = clip_grad
         self.early_stopping_patience = early_stopping_patience
         self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
-        model = Model(use_large=dataloader.use_large, dropout=dropout, save_all=save_all, artefact_dir=artefact_dir)
-        model.load_model(self.labels)
+        model = Model(use_large=dataloader.use_large, learning_rate=learning_rate, dropout=dropout, save_all=save_all, artefact_dir=artefact_dir)
+        model.load_model(self.dataloader.labels)
         self.model_params = model
         self.epoch_params = EpochMixin()
 
@@ -56,7 +55,7 @@ class TrainCustomModel:
             "train_fraction": self.dataloader.train_fraction,
             "use_large": self.dataloader.use_large,
             "concurrency": self.concurrency,
-            "learning_rate": self.learning_rate,
+            "learning_rate": self.model_params.learning_rate,
             "epochs": self.epochs,
             "dropout": self.model_params.dropout,
             "save_all": self.model_params.save_all,
@@ -86,7 +85,7 @@ class TrainCustomModel:
             print("#"*40, flush=True)
             print(
                 f"EPOCH START TIME: {str(self.epoch_params.epoch_time)}\tEPOCH NUMBER: {epoch}", flush=True)
-            for batch_idx, batch in enumerate(self.model_params.train_dataloader):
+            for batch_idx, batch in enumerate(self.dataloader.train_dataloader):
                 self.epoch_params.reset_batch()
                 print("$"*40, flush=True)
                 print(
