@@ -2,7 +2,6 @@ import traceback
 import datetime
 import copy
 import torch
-from datasets import load_metric
 import numpy as np
 
 from model import Model
@@ -48,11 +47,26 @@ class TrainCustomModel:
                                                       self.concurrency: i*self.concurrency + self.concurrency]
                 sample_groups.append(empty_batch)
             return sample_groups
+        
+    def get_model_config(self):
+        config = {
+            "batch_size": self.dataloader.batch_size,
+            "stride": self.dataloader.stride,
+            "max_length": self.dataloader.max_length,
+            "train_fraction": self.dataloader.train_fraction,
+            "use_large": self.dataloader.use_large,
+            "concurrency": self.concurrency,
+            "learning_rate": self.learning_rate,
+            "epochs": self.epochs,
+            "dropout": self.model_params.dropout,
+            "save_all": self.model_params.save_all,
+            "artefact_dir": self.model_params.artefact_dir,
+            "clip_grad": self.clip_grad,
+            "early_stopping_patience": self.early_stopping_patience
+        }
+        return config
 
     def train(self):
-        train_metric = load_metric("seqeval")
-        eval_metric = load_metric("seqeval")
-        
         self.model_params.model.to(self.device)
         self.model_params.start_time = datetime.datetime.now()
 
@@ -125,11 +139,11 @@ class TrainCustomModel:
                     [self.dataloader.id2label[l.item()] for (p, l) in zip(prediction, label) if l != -100]
                     for prediction, label in zip(self.epoch_params.batch_predictions, self.epoch_params.batch_labels)
                 ]
-                train_metric.add_batch(predictions=true_predictions, references=true_labels)
+                self.model_params.train_metric.add_batch(predictions=true_predictions, references=true_labels)
 
                 print(f"TOTAL BATCH TIME: {datetime.datetime.now()-self.epoch_params.batch_time}", flush=True)
 
-            train_score = train_metric.compute()
+            train_score = self.model_params.train_metric.compute()
             print("TRAIN SCORE = ", flush=True)
             for k, v in train_score.items():
                 print(k, ":", v, flush=True)
@@ -183,9 +197,9 @@ class TrainCustomModel:
                         [self.dataloader.id2label[l.item()] for (p, l) in zip(prediction, label) if l != -100]
                         for prediction, label in zip(self.epoch_params.batch_predictions, self.epoch_params.batch_labels)
                     ]
-                    eval_metric.add_batch(predictions=true_predictions, references=true_labels)
+                    self.model_params.eval_metric.add_batch(predictions=true_predictions, references=true_labels)
 
-            eval_score = eval_metric.compute()
+            eval_score = self.model_params.eval_metric.compute()
             print("EVAL SCORE = ", flush=True)
             for k, v in eval_score.items():
                 print(k, ":", v, flush=True)
@@ -198,7 +212,7 @@ class TrainCustomModel:
             if (eval_loss < self.model_params.last_best or eval_score["overall_f1"] > self.model_params.last_best_f1) or (self.save_all):
                 last_best = min(last_best, eval_loss)
                 last_best_f1 = max(last_best_f1, eval_score["overall_f1"])
-                self.model.save_model(epoch, last_best, last_best_f1)
+                self.model.save_model(epoch, self.get_model_config(), self.dataloader)
 
             self.model_params.scheduler.step(eval_loss)
             if len(self.model_params.eval_losses) > self.early_stopping_patience and min(self.model_params.eval_losses[-1*self.early_stopping_patience:]) > self.model_params.last_best:

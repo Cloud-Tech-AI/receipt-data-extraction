@@ -2,6 +2,7 @@ import os
 import torch
 from transformers import AutoProcessor, AutoModelForTokenClassification
 from transformers import AdamW
+from datasets import load_metric
 
 from mixins import TrainerMixin, TimeMixin
 
@@ -53,6 +54,9 @@ class Model(TrainerMixin, TimeMixin, BaseClass):
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.model.optimizer, 'min', verbose=True, patience=5)
         self.epoch_num = 0
+        self.train_metric = load_metric("seqeval")
+        self.eval_metric = load_metric("seqeval")
+        
 
     def save_model(self, epoch, config, dataloader):
         if "saved_models" not in list(os.listdir(f"{self.artefact_dir}")):
