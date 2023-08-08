@@ -60,6 +60,6 @@ if "__main__" == __name__:
     open(os.path.join(args.artefact_dir, "test_annotation.json"),
          "w").write(json.dumps(dataloader.test_annotations))
 
-    trainer = TrainCustomModel(dataloader.train_annotations, dataloader.test_annotations, dataloader.labels,
-                               args.lr, args.epochs, args.dropout, args.clip_grad, args.early_stopping_patience)
+    trainer = TrainCustomModel(dataloader, args.concurrency, args.lr, args.epochs, args.dropout,
+                               args.save_all, args.artefact_dir, args.clip_grad, args.early_stopping_patience)
     trainer.train()
