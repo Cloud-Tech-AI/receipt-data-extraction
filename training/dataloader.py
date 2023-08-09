@@ -43,7 +43,7 @@ class ReceiptDataset(torch.utils.data.Dataset):
             boxes=boxes,
             word_labels=word_labels,
             padding="max_length",
-            truncation="only_second",
+            truncation=True,
             max_length=self.max_length,
             return_tensors="pt",
             return_offsets_mapping=True,
@@ -98,7 +98,6 @@ class ReceiptDataLoader:
         self.labels = self.get_unique_labels()
         self.label2id = {v: k for k, v in enumerate(self.labels)}
         self.id2label = {k: v for k, v in enumerate(self.labels)}
-        self.annotations = self.annotations[:10]
         self.train_annotations, self.test_annotations = self.get_train_test_split()
         self.train_dataset, self.test_dataset = self.get_dataset()
         self.train_dataloader, self.test_dataloader = self.get_dataloader()
