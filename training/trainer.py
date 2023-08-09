@@ -120,10 +120,11 @@ class TrainCustomModel:
                         outputs = self.model_params.model(**group)
                     except Exception as e:
                         raise
-                    self.epoch_params.batch_predictions.extend(outputs.logits.argmax(dim=2).detach())
-                    self.epoch_params.batch_labels.extend(group['labels'].detach())
-                    self.epoch_params.batch_attention.extend(group['attention_mask'].detach())
-
+            
+                    self.epoch_params.batch_predictions = torch.cat(self.epoch_params.batch_predictions, outputs.logits.argmax(dim=2).detach())
+                    self.epoch_params.batch_labels = torch.cat(self.epoch_params.batch_labels, group['labels'].detach())
+                    self.epoch_params.batch_attention = torch.cat(self.epoch_params.batch_attention, group['attention_mask'].detach())
+            
                 loss = self.cross_entropy_loss(
                     logits=self.epoch_params.batch_predictions,
                     labels=self.epoch_params.batch_labels,
@@ -187,9 +188,10 @@ class TrainCustomModel:
                             outputs = self.model_params.model(**group)
                         except Exception as e:
                             raise
-                        self.epoch_params.batch_predictions.extend(outputs.logits.argmax(dim=2).detach())
-                        self.epoch_params.batch_labels.extend(group['labels'].detach())
-                        self.epoch_params.batch_attention.extend(group['attention_mask'].detach())
+
+                        self.epoch_params.batch_predictions = torch.cat(self.epoch_params.batch_predictions, outputs.logits.argmax(dim=2).detach())
+                        self.epoch_params.batch_labels = torch.cat(self.epoch_params.batch_labels, group['labels'].detach())
+                        self.epoch_params.batch_attention = torch.cat(self.epoch_params.batch_attention, group['attention_mask'].detach())
             
                     loss = self.cross_entropy_loss(
                         logits=self.epoch_params.batch_predictions,
