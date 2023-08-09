@@ -1,3 +1,4 @@
+import torch
 import datetime
 
 
@@ -38,6 +39,6 @@ class EpochMixin:
     def reset_batch(self):
         self.batch_time = datetime.datetime.now()
 
-        self.batch_predictions = []
-        self.batch_labels = []
-        self.batch_attention = []
+        self.batch_predictions = torch.tensor([]).type(torch.LongTensor)
+        self.batch_labels = torch.tensor([]).type(torch.LongTensor)
+        self.batch_attention = torch.tensor([]).type(torch.LongTensor)

@@ -121,13 +121,13 @@ class TrainCustomModel:
                     except Exception as e:
                         raise
                     self.epoch_params.batch_predictions.extend(outputs.logits.argmax(dim=2).detach())
-                    self.epoch_params.batch_labels.extend(batch['labels'].detach())
-                    self.epoch_params.batch_attention.extend(batch['attention_mask'].detach())
+                    self.epoch_params.batch_labels.extend(group['labels'].detach())
+                    self.epoch_params.batch_attention.extend(group['attention_mask'].detach())
 
                 loss = self.cross_entropy_loss(
-                    logits=outputs.logits,
-                    labels=batch['labels'],
-                    attention_mask=batch['attention_mask']
+                    logits=self.epoch_params.batch_predictions,
+                    labels=self.epoch_params.batch_labels,
+                    attention_mask=self.epoch_params.batch_attention
                 )
                 loss.backward()
                 if self.clip_grad is not None:
@@ -188,13 +188,13 @@ class TrainCustomModel:
                         except Exception as e:
                             raise
                         self.epoch_params.batch_predictions.extend(outputs.logits.argmax(dim=2).detach())
-                        self.epoch_params.batch_labels.extend(batch['labels'].detach())
-                        self.epoch_params.batch_attention.extend(batch['attention_mask'].detach())
+                        self.epoch_params.batch_labels.extend(group['labels'].detach())
+                        self.epoch_params.batch_attention.extend(group['attention_mask'].detach())
             
                     loss = self.cross_entropy_loss(
-                        logits=outputs.logits,
-                        labels=batch['labels'],
-                        attention_mask=batch['attention_mask']
+                        logits=self.epoch_params.batch_predictions,
+                        labels=self.epoch_params.batch_labels,
+                        attention_mask=self.epoch_params.batch_attention
                     )
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
                     
