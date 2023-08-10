@@ -171,6 +171,7 @@ class TrainCustomModel:
             self.model_params.model.eval()
             for batch in self.dataloader.test_dataloader:
                 with torch.no_grad():
+                    self.epoch_params.reset_batch()
                     sample_groups = self.group_samples(batch)
                     loss = None
                     # Take sub batches, accumulate gradients and loss
