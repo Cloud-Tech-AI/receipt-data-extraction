@@ -65,7 +65,6 @@ class TrainCustomModel:
         return config
     
     def cross_entropy_loss(self, logits, labels, attention_mask, size_average=True):
-        print(logits.shape, labels.shape)
         logits = logits.view(-1, logits.size(-1))
         labels = labels.view(-1)
         loss = torch.nn.functional.cross_entropy(logits, labels, reduction='none', label_smoothing=0.1)
@@ -82,7 +81,6 @@ class TrainCustomModel:
 
         print(f"TRAINING START TIME: {str(self.model_params.start_time)}", flush=True)
         print("="*40, flush=True)
-        print("="*40, flush=True)
         for epoch in range(self.model_params.epoch_num, self.epochs):
             
             #####################################################
@@ -92,7 +90,6 @@ class TrainCustomModel:
             self.model_params.model.train()
             self.epoch_params.reset_epoch()
             # self.model_params.epoch_list.append(epoch)
-            print("#"*40, flush=True)
             print("#"*40, flush=True)
             print(
                 f"EPOCH START TIME: {str(self.epoch_params.epoch_time)}\tEPOCH NUMBER: {epoch}", flush=True)
@@ -122,16 +119,15 @@ class TrainCustomModel:
                         outputs = self.model_params.model(**group)
                     except Exception as e:
                         raise
-                    print(outputs.logits.shape, group["labels"].shape, group["attention_mask"].shape)
-                        
-                    self.epoch_params.batch_predictions.extend(outputs.logits.argmax(dim=2).detach())
-                    self.epoch_params.batch_labels.extend(group['labels'].detach())
-                    self.epoch_params.batch_attention.extend(group['attention_mask'].detach())
+                    
+                    self.epoch_params.batch_predictions.append(outputs.logits.detach())
+                    self.epoch_params.batch_labels.append(group['labels'].detach())
+                    self.epoch_params.batch_attention.append(group['attention_mask'].detach())
 
                 loss = self.cross_entropy_loss(
-                    logits=torch.cat(self.epoch_params.batch_predictions,dim=2).to(torch.float32).requires_grad_(),
-                    labels=torch.cat(self.epoch_params.batch_labels,dim=2).to(torch.float32).requires_grad_(),
-                    attention_mask=torch.cat(self.epoch_params.batch_attention,dim=2).to(torch.float32).requires_grad_()
+                    logits=torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_(),
+                    labels=torch.cat(self.epoch_params.batch_labels,dim=0).to(torch.float32).requires_grad_(),
+                    attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0).to(torch.float32).requires_grad_()
                 )
                 loss.backward()
                 if self.clip_grad is not None:
@@ -153,7 +149,8 @@ class TrainCustomModel:
                 self.model_params.train_metric.add_batch(predictions=true_predictions, references=true_labels)
 
                 print(f"TOTAL BATCH TIME: {datetime.datetime.now()-self.epoch_params.batch_time}", flush=True)
-
+                print("$"*40, flush=True)
+                
             train_score = self.model_params.train_metric.compute()
             print("TRAIN SCORE = ", flush=True)
             for k, v in train_score.items():
@@ -190,14 +187,14 @@ class TrainCustomModel:
                             outputs = self.model_params.model(**group)
                         except Exception as e:
                             raise
-                        self.epoch_params.batch_predictions.extend(outputs.logits.argmax(dim=2).detach())
-                        self.epoch_params.batch_labels.extend(group['labels'].detach())
-                        self.epoch_params.batch_attention.extend(group['attention_mask'].detach())
+                        self.epoch_params.batch_predictions.append(outputs.logits.argmax(dim=2).detach())
+                        self.epoch_params.batch_labels.append(group['labels'].detach())
+                        self.epoch_params.batch_attention.append(group['attention_mask'].detach())
             
                     loss = self.cross_entropy_loss(
-                        logits=torch.cat(self.epoch_params.batch_predictions,dim=3).to(torch.float32),
-                        labels=torch.cat(self.epoch_params.batch_labels,dim=3).to(torch.float32),
-                        attention_mask=torch.cat(self.epoch_params.batch_attention,dim=3).to(torch.float32)
+                        logits=torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32),
+                        labels=torch.cat(self.epoch_params.batch_labels,dim=0).to(torch.float32),
+                        attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0).to(torch.float32)
                     )
 
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
@@ -234,10 +231,8 @@ class TrainCustomModel:
 
             print(f"TOTAL EPOCH TIME: {datetime.datetime.now()-self.epoch_params.epoch_time}", flush=True)
             print("#"*40, flush=True)
-            print("#"*40, flush=True)
-
+            
         self.model_params.end_time = datetime.datetime.now()
         self.model_params.total_time = self.model_params.end_time - self.model_params.start_time
         print(f"TOTAL TRAINING TIME: {self.model_params.total_time}", flush=True)
-        print("="*40, flush=True)
         print("="*40, flush=True)
