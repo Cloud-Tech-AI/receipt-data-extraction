@@ -124,10 +124,13 @@ class TrainCustomModel:
                     self.epoch_params.batch_labels.append(group['labels'].detach())
                     self.epoch_params.batch_attention.append(group['attention_mask'].detach())
 
+                self.epoch_params.batch_predictions = torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_()
+                self.epoch_params.batch_labels = torch.cat(self.epoch_params.batch_labels,dim=0)
+                self.epoch_params.batch_attention = torch.cat(self.epoch_params.batch_attention,dim=0)
                 loss = self.cross_entropy_loss(
-                    logits=torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_(),
-                    labels=torch.cat(self.epoch_params.batch_labels,dim=0),
-                    attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0)
+                    logits=self.epoch_params.batch_predictions,
+                    labels=self.epoch_params.batch_labels,
+                    attention_mask=self.epoch_params.batch_attention
                 )
                 loss.backward()
                 if self.clip_grad is not None:
@@ -191,10 +194,13 @@ class TrainCustomModel:
                         self.epoch_params.batch_labels.append(group['labels'].detach())
                         self.epoch_params.batch_attention.append(group['attention_mask'].detach())
             
+                    self.epoch_params.batch_predictions = torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_()
+                    self.epoch_params.batch_labels = torch.cat(self.epoch_params.batch_labels,dim=0)
+                    self.epoch_params.batch_attention = torch.cat(self.epoch_params.batch_attention,dim=0)
                     loss = self.cross_entropy_loss(
-                        logits=torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_(),
-                        labels=torch.cat(self.epoch_params.batch_labels,dim=0),
-                        attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0)
+                        logits=self.epoch_params.batch_predictions,
+                        labels=self.epoch_params.batch_labels,
+                        attention_mask=self.epoch_params.batch_attention
                     )
 
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
