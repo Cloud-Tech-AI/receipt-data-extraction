@@ -72,7 +72,6 @@ class TrainCustomModel:
             loss = loss * attention_mask.view(-1)
         if size_average:
             loss = loss.sum() / attention_mask.sum()
-        print(loss)
         return loss
 
     def train(self):
