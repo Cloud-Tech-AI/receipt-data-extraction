@@ -126,8 +126,8 @@ class TrainCustomModel:
 
                 loss = self.cross_entropy_loss(
                     logits=torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_(),
-                    labels=torch.cat(self.epoch_params.batch_labels,dim=0).to(torch.float32).requires_grad_(),
-                    attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0).to(torch.float32).requires_grad_()
+                    labels=torch.cat(self.epoch_params.batch_labels,dim=0),
+                    attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0)
                 )
                 loss.backward()
                 if self.clip_grad is not None:
@@ -192,13 +192,13 @@ class TrainCustomModel:
                         self.epoch_params.batch_attention.append(group['attention_mask'].detach())
             
                     loss = self.cross_entropy_loss(
-                        logits=torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32),
-                        labels=torch.cat(self.epoch_params.batch_labels,dim=0).to(torch.float32),
-                        attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0).to(torch.float32)
+                        logits=torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_(),
+                        labels=torch.cat(self.epoch_params.batch_labels,dim=0),
+                        attention_mask=torch.cat(self.epoch_params.batch_attention,dim=0)
                     )
 
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
-                    
+
                     true_predictions = [
                         [self.dataloader.id2label[p.item()] for (p, l) in zip(prediction, label) if l != -100] 
                         for prediction, label in zip(self.epoch_params.batch_predictions, self.epoch_params.batch_labels)
