@@ -191,7 +191,7 @@ class TrainCustomModel:
                             outputs = self.model_params.model(**group)
                         except Exception as e:
                             raise
-                        self.epoch_params.batch_predictions.append(outputs.logits.argmax(dim=2).detach())
+                        self.epoch_params.batch_predictions.append(outputs.logits.detach())
                         self.epoch_params.batch_labels.append(group['labels'].detach())
                         self.epoch_params.batch_attention.append(group['attention_mask'].detach())
             
