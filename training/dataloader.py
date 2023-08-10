@@ -152,7 +152,7 @@ class ReceiptDataLoader:
         train_dataloader = torch.utils.data.DataLoader(self.train_dataset,
                                                     sampler=train_sampler,
                                                     batch_size=None,
-                                                    num_workers=4)
+                                                    num_workers=2)
         
         test_sampler = torch.utils.data.SequentialSampler(self.test_dataset)
         test_sampler = torch.utils.data.BatchSampler(test_sampler,
@@ -161,6 +161,6 @@ class ReceiptDataLoader:
         test_dataloader = torch.utils.data.DataLoader(self.test_dataset,
                                                     sampler=test_sampler,
                                                     batch_size=None,
-                                                    num_workers=4)
+                                                    num_workers=2)
 
         return train_dataloader, test_dataloader
