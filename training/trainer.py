@@ -142,7 +142,7 @@ class TrainCustomModel:
                 self.model_params.train_steps+=1
                 
                 true_predictions = [
-                    [self.dataloader.id2label[p.item()] for (p, l) in zip(prediction, label) if l != -100] 
+                    [self.dataloader.id2label[p.argmax(dim=2).item()] for (p, l) in zip(prediction, label) if l != -100] 
                     for prediction, label in zip(self.epoch_params.batch_predictions, self.epoch_params.batch_labels)
                 ]
                 true_labels = [
@@ -206,7 +206,7 @@ class TrainCustomModel:
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
 
                     true_predictions = [
-                        [self.dataloader.id2label[p.item()] for (p, l) in zip(prediction, label) if l != -100] 
+                        [self.dataloader.id2label[p.argmax(dim=2).item()] for (p, l) in zip(prediction, label) if l != -100] 
                         for prediction, label in zip(self.epoch_params.batch_predictions, self.epoch_params.batch_labels)
                     ]
                     true_labels = [
