@@ -41,7 +41,7 @@ class PreprocessorSROIE():
             int(1000 * (bbox[3] / height)),
         ]
 
-    def process_box(self, path):
+    def process_box(self, path, width):
         # Split Bounding box coordinates for each word
         data = open(path, 'r').readlines()
         lines = []
@@ -49,14 +49,23 @@ class PreprocessorSROIE():
             line = line.strip('\n').strip().split(',')
             text = ",".join(line[8:])
 
-            per_word_width = (int(line[6]) - int(line[0]))/len(text)
+            per_word_width = (int(line[4]) - int(line[0]))/len(text)
             words = text.split(' ')
             word_pointer = int(line[0])
             line_words = []
             for word in words:
-                line_words.append([[word_pointer, int(
-                    line[1]), word_pointer+per_word_width*len(word), int(line[7])], word, "OTHER"])
-                word_pointer += per_word_width*len(word)+per_word_width
+                new_pointer = per_word_width*len(word)+per_word_width
+                line_words.append([
+                    [
+                        word_pointer,
+                        int(line[1]),
+                        word_pointer+new_pointer if word_pointer+new_pointer < width else width,
+                        int(line[7])
+                    ],
+                    word,
+                    "OTHER"
+                ])
+                word_pointer = word_pointer+new_pointer if word_pointer+new_pointer < width else width
             lines.append(line_words)
         return lines
 
@@ -83,9 +92,7 @@ class PreprocessorSROIE():
                             if word[1] in v:
                                 word[2] = k.upper()
 
-    def get_processed_data(self, lines, img_path):
-        image = Image.open(img_path).convert('RGB')
-        width, height = image.size
+    def get_processed_data(self, lines, width, height):
         for line in lines:
             for word in line:
                 self.box_data.append(self.normalize_bbox(word[0], width, height))
@@ -95,10 +102,12 @@ class PreprocessorSROIE():
     def process(self):
         for file in tqdm(self.base_files):
             img_path = self.base_path+self.img_path+file+'.jpg'
-            lines = self.process_box(self.base_path+self.box_path+file+'.txt')
+            image = Image.open(img_path).convert('RGB')
+            width, height = image.size
+            lines = self.process_box(self.base_path+self.box_path+file+'.txt', width)
             self.process_entities(
                 self.base_path+self.entities_path+file+'.txt', lines)
-            self.get_processed_data(lines, img_path)
+            self.get_processed_data(lines, width, height)
             if self.process_mode == 'train':
                 self.processed_data.append({
                     'imgs': img_path,

@@ -49,8 +49,8 @@ if "__main__" == __name__:
                     args.run_name), exist_ok=True)
         args.artefact_dir = os.path.join(args.artefact_dir, args.run_name)
 
-    # sys.stdout = open(os.path.join(args.artefact_dir, "layoutlm_log.log"), "a")
-    # sys.stderr = open(os.path.join(args.artefact_dir, "layoutlm_err.log"), "a")
+    sys.stdout = open(os.path.join(args.artefact_dir, "layoutlm_log.log"), "a")
+    sys.stderr = open(os.path.join(args.artefact_dir, "layoutlm_err.log"), "a")
 
     dataloader = ReceiptDataLoader(
         args.data, args.batch_size, args.stride, args.max_length, args.train_fraction, args.use_large)
