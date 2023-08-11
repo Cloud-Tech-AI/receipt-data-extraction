@@ -11,7 +11,6 @@ from mixins import EpochMixin
 class TrainCustomModel:
     def __init__(self,
                  dataloader,
-                 concurrency,
                  learning_rate,
                  epochs,
                  dropout,
@@ -21,7 +20,6 @@ class TrainCustomModel:
                  early_stopping_patience,
                  ):
         self.dataloader = dataloader
-        self.concurrency = concurrency
         self.epochs = epochs
         self.clip_grad = clip_grad
         self.early_stopping_patience = early_stopping_patience
@@ -32,20 +30,56 @@ class TrainCustomModel:
         self.model_params = model_params
         self.epoch_params = EpochMixin()
 
-    def group_samples(self, batch):
-        num_sample_groups = int(
-            np.ceil(batch["input_ids"].shape[0]/self.concurrency))
-        if num_sample_groups == 1:
+    def get_sub_batches(self, batch):
+        num_sample_batches = int(
+            np.ceil(batch["input_ids"].shape[0]/self.dataloader.batch_size))
+        if num_sample_batches == 1:
             return [batch]
         else:
-            sample_groups = []
-            for i in range(num_sample_groups):
+            sub_batches = []
+            for i in range(num_sample_batches):
                 empty_batch = {k: [] for k, v in batch.items()}
                 for k, v in empty_batch.items():
-                    empty_batch[k] = batch[k][i*self.concurrency: i*self.concurrency + self.concurrency]
-                sample_groups.append(empty_batch)
-            return sample_groups
-        
+                    empty_batch[k] = batch[k][i*self.dataloader.batch_size: i*self.dataloader.batch_size + self.dataloader.batch_size]
+                sub_batches.append(empty_batch)
+            return sub_batches
+    
+    def handle_batch_overflow(self):
+        loss = None
+        sub_batches = self.get_sub_batches(self.batch)
+        for sub_batch in sub_batches:
+            for k, v in sub_batch.items():
+                # remove unwanted index
+                if k in ["idx"]:
+                    continue
+                # put on device
+                sub_batch[k] = v.to(self.device)
+            del sub_batch["idx"]
+            # del _temp
+            # forward + backward + optimize
+            # sub_batch = torch.tensor(**sub_batch).to(torch.long64)
+            try:
+                outputs = self.model_params.model(**sub_batch)
+            except Exception as e:
+                raise
+
+            if loss is None:
+                loss = self.cross_entropy_loss(
+                    logits=outputs.logits,
+                    labels=sub_batch['labels'].detach(),
+                    attention_mask=sub_batch['attention_mask'].detach()
+                )
+            else:
+                loss += self.cross_entropy_loss(
+                    logits=outputs.logits,
+                    labels=sub_batch['labels'].detach(),
+                    attention_mask=sub_batch['attention_mask'].detach()
+                )
+            
+            self.epoch_params.batch_predictions = torch.cat([self.epoch_params.batch_predictions, outputs.logits.detach()])
+            self.epoch_params.batch_labels = torch.cat([self.epoch_params.batch_labels, sub_batch['labels'].detach()])
+            self.epoch_params.batch_attention = torch.cat([self.epoch_params.batch_attention, sub_batch['attention_mask'].detach()])
+
     def get_model_config(self):
         config = {
             "batch_size": self.dataloader.batch_size,
@@ -53,7 +87,6 @@ class TrainCustomModel:
             "max_length": self.dataloader.max_length,
             "train_fraction": self.dataloader.train_fraction,
             "use_large": self.dataloader.use_large,
-            "concurrency": self.concurrency,
             "learning_rate": self.model_params.learning_rate,
             "epochs": self.epochs,
             "dropout": self.model_params.dropout,
@@ -100,37 +133,7 @@ class TrainCustomModel:
                 
                 # zero the parameter gradients
                 self.model_params.optimizer.zero_grad()
-                sample_groups = self.group_samples(batch)
-                loss = None
-                # Take sub batches, accumulate gradients and loss
-                for group in sample_groups:
-                    for k, v in group.items():
-                        # remove unwanted index
-                        if k in ["idx"]:
-                            continue
-                        # put on device
-                        group[k] = v.to(self.device)
-                    del group["idx"]
-                    # del _temp
-                    # forward + backward + optimize
-                    # group = torch.tensor(**group).to(torch.long64)
-                    try:
-                        outputs = self.model_params.model(**group)
-                    except Exception as e:
-                        raise
-                    
-                    self.epoch_params.batch_predictions.append(outputs.logits.detach())
-                    self.epoch_params.batch_labels.append(group['labels'].detach())
-                    self.epoch_params.batch_attention.append(group['attention_mask'].detach())
-
-                self.epoch_params.batch_predictions = torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_()
-                self.epoch_params.batch_labels = torch.cat(self.epoch_params.batch_labels,dim=0)
-                self.epoch_params.batch_attention = torch.cat(self.epoch_params.batch_attention,dim=0)
-                loss = self.cross_entropy_loss(
-                    logits=self.epoch_params.batch_predictions,
-                    labels=self.epoch_params.batch_labels,
-                    attention_mask=self.epoch_params.batch_attention
-                )
+                loss = self.handle_batch_overflow(self)
                 loss.backward()
                 if self.clip_grad is not None:
                     torch.nn.utils.clip_grad_norm_(
@@ -171,38 +174,7 @@ class TrainCustomModel:
             for batch in self.dataloader.test_dataloader:
                 with torch.no_grad():
                     self.epoch_params.reset_batch()
-                    sample_groups = self.group_samples(batch)
-                    loss = None
-                    # Take sub batches, accumulate gradients and loss
-                    for group in sample_groups:
-                        for k, v in group.items():
-                            # remove unwanted index
-                            if k in ["idx"]:
-                                continue
-                            # put on device
-                            group[k] = v.to(self.device)
-                        del group["idx"]
-
-                        # del _temp
-                        # forward + backward + optimize
-                        # group = torch.tensor(**group).to(torch.long64)
-                        try:
-                            outputs = self.model_params.model(**group)
-                        except Exception as e:
-                            raise
-                        self.epoch_params.batch_predictions.append(outputs.logits.detach())
-                        self.epoch_params.batch_labels.append(group['labels'].detach())
-                        self.epoch_params.batch_attention.append(group['attention_mask'].detach())
-            
-                    self.epoch_params.batch_predictions = torch.cat(self.epoch_params.batch_predictions,dim=0).to(torch.float32).requires_grad_()
-                    self.epoch_params.batch_labels = torch.cat(self.epoch_params.batch_labels,dim=0)
-                    self.epoch_params.batch_attention = torch.cat(self.epoch_params.batch_attention,dim=0)
-                    loss = self.cross_entropy_loss(
-                        logits=self.epoch_params.batch_predictions,
-                        labels=self.epoch_params.batch_labels,
-                        attention_mask=self.epoch_params.batch_attention
-                    )
-
+                    loss = self.handle_batch_overflow(self)
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
 
                     true_predictions = [

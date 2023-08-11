@@ -22,9 +22,8 @@ if "__main__" == __name__:
     arg_parser.add_argument('--device', type=str, default='cuda:0', help='device (CPU, if CUDA not available)')
     arg_parser.add_argument('--use_large', default=False, action='store_true', help='use layoutlmv2-large-uncased as base model')
     arg_parser.add_argument('--save_all', action='store_true', help='')
-    arg_parser.add_argument('--concurrency', type=int, default=4, help='samples that model will process in parallel')
 
-    arg_parser.add_argument('--batch_size', type=int, default=32, help='batch size')
+    arg_parser.add_argument('--batch_size', type=int, default=4, help='batch size')
     arg_parser.add_argument('--stride', type=int, default=50, help='stride across tokens in case of overflow')
     arg_parser.add_argument('--max_length', type=int, default=512, help='max length of input sequence')
     arg_parser.add_argument('--train_fraction', type=float, default=0.85, help='fraction of data to use for training (between 0 nad 1)')
@@ -49,8 +48,8 @@ if "__main__" == __name__:
                     args.run_name), exist_ok=True)
         args.artefact_dir = os.path.join(args.artefact_dir, args.run_name)
 
-    sys.stdout = open(os.path.join(args.artefact_dir, "layoutlm_log.log"), "a")
-    sys.stderr = open(os.path.join(args.artefact_dir, "layoutlm_err.log"), "a")
+    # sys.stdout = open(os.path.join(args.artefact_dir, "layoutlm_log.log"), "a")
+    # sys.stderr = open(os.path.join(args.artefact_dir, "layoutlm_err.log"), "a")
 
     dataloader = ReceiptDataLoader(
         args.data, args.batch_size, args.stride, args.max_length, args.train_fraction, args.use_large)
@@ -60,6 +59,6 @@ if "__main__" == __name__:
     open(os.path.join(args.artefact_dir, "test_annotation.json"),
          "w").write(json.dumps(dataloader.test_annotations))
 
-    trainer = TrainCustomModel(dataloader, args.concurrency, args.lr, args.epochs, args.dropout,
+    trainer = TrainCustomModel(dataloader, args.lr, args.epochs, args.dropout,
                                args.save_all, args.artefact_dir, args.clip_grad, args.early_stopping_patience)
     trainer.train()
