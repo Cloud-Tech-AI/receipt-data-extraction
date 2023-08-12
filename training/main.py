@@ -28,7 +28,7 @@ if "__main__" == __name__:
     arg_parser.add_argument('--max_length', type=int, default=512, help='max length of input sequence')
     arg_parser.add_argument('--train_fraction', type=float, default=0.85, help='fraction of data to use for training (between 0 nad 1)')
     arg_parser.add_argument('--epochs', type=int, default=100, help='number of epochs')
-    arg_parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
+    arg_parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
     arg_parser.add_argument('--dropout', type=float, default=None, help='change dropout')
     arg_parser.add_argument('--clip_grad', type=float, default=None, help='gradient clipping value')
     arg_parser.add_argument('--early_stopping_patience', type=int, default=15, help='No of epochs to wait after min loss/max f1 score')

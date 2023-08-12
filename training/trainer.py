@@ -44,9 +44,9 @@ class TrainCustomModel:
                 sub_batches.append(empty_batch)
             return sub_batches
     
-    def handle_batch_overflow(self):
+    def handle_batch_overflow(self, batch):
         loss = None
-        sub_batches = self.get_sub_batches(self.batch)
+        sub_batches = self.get_sub_batches(batch)
         for sub_batch in sub_batches:
             for k, v in sub_batch.items():
                 # remove unwanted index
@@ -76,9 +76,10 @@ class TrainCustomModel:
                     attention_mask=sub_batch['attention_mask'].detach()
                 )
             
-            self.epoch_params.batch_predictions = torch.cat([self.epoch_params.batch_predictions, outputs.logits.detach()])
-            self.epoch_params.batch_labels = torch.cat([self.epoch_params.batch_labels, sub_batch['labels'].detach()])
-            self.epoch_params.batch_attention = torch.cat([self.epoch_params.batch_attention, sub_batch['attention_mask'].detach()])
+            self.epoch_params.batch_predictions = torch.cat([self.epoch_params.batch_predictions, outputs.logits.detach().cpu()])
+            self.epoch_params.batch_labels = torch.cat([self.epoch_params.batch_labels, sub_batch['labels'].detach().cpu()])
+            self.epoch_params.batch_attention = torch.cat([self.epoch_params.batch_attention, sub_batch['attention_mask'].detach().cpu()])
+        return loss
 
     def get_model_config(self):
         config = {
@@ -133,7 +134,7 @@ class TrainCustomModel:
                 
                 # zero the parameter gradients
                 self.model_params.optimizer.zero_grad()
-                loss = self.handle_batch_overflow(self)
+                loss = self.handle_batch_overflow(batch)
                 loss.backward()
                 if self.clip_grad is not None:
                     torch.nn.utils.clip_grad_norm_(
@@ -174,7 +175,7 @@ class TrainCustomModel:
             for batch in self.dataloader.test_dataloader:
                 with torch.no_grad():
                     self.epoch_params.reset_batch()
-                    loss = self.handle_batch_overflow(self)
+                    loss = self.handle_batch_overflow(batch)
                     self.epoch_params.epoch_eval_loss.append(loss.detach().item())
 
                     true_predictions = [
