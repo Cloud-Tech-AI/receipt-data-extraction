@@ -4,6 +4,9 @@ from PIL import Image
 from tqdm import tqdm
 import jellyfish
 
+from temp import upload_file
+from collections import defaultdict
+
 
 class PreprocessorSROIE():
     def __init__(self,
@@ -63,9 +66,10 @@ class PreprocessorSROIE():
                         int(line[7])
                     ],
                     word,
-                    "OTHER"
+                    "O"
                 ])
-                word_pointer = word_pointer+new_pointer if word_pointer+new_pointer < width else width
+                word_pointer = word_pointer+new_pointer if word_pointer + \
+                    new_pointer < width else width
             lines.append(line_words)
         return lines
 
@@ -93,18 +97,34 @@ class PreprocessorSROIE():
                                 word[2] = k.upper()
 
     def get_processed_data(self, lines, width, height):
+        label_dict = {
+            "COMPANY": 0,
+            "DATE": 0,
+            "ADDRESS": 0,
+            "TOTAL": 0
+        }
         for line in lines:
+            line = sorted(line, key=lambda x: x[0][0])
             for word in line:
-                self.box_data.append(self.normalize_bbox(word[0], width, height))
+                self.box_data.append(
+                    self.normalize_bbox(word[0], width, height))
                 self.word_data.append(word[1])
-                self.entities_data.append(word[2])
+                if word[2] in label_dict:
+                    if label_dict[word[2]] == 0:
+                        self.entities_data.append("B-"+word[2])
+                        label_dict[word[2]] = 1
+                    else:
+                        self.entities_data.append("I-"+word[2])
+                else:
+                    self.entities_data.append("O")
 
     def process(self):
         for file in tqdm(self.base_files):
             img_path = self.base_path+self.img_path+file+'.jpg'
             image = Image.open(img_path).convert('RGB')
             width, height = image.size
-            lines = self.process_box(self.base_path+self.box_path+file+'.txt', width)
+            lines = self.process_box(
+                self.base_path+self.box_path+file+'.txt', width)
             self.process_entities(
                 self.base_path+self.entities_path+file+'.txt', lines)
             self.get_processed_data(lines, width, height)
@@ -117,7 +137,7 @@ class PreprocessorSROIE():
                 })
             else:
                 self.processed_data.append({
-                    'imgs': self.base_path+self.img_path+file+'.jpg',
+                    'imgs': img_path,
                     'boxes': self.box_data,
                     'words': self.word_data,
                 })
