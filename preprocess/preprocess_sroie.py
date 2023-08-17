@@ -4,7 +4,6 @@ from PIL import Image
 from tqdm import tqdm
 import jellyfish
 
-from temp import upload_file
 from collections import defaultdict
 
 
