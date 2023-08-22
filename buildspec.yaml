@@ -5,6 +5,7 @@ phases:
     runtime-versions:
       python: 3.11
     commands:
+    - pip install poetry
     - poetry install -v
 
   build:
