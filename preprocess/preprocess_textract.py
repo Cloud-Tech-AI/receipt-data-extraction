@@ -1,4 +1,4 @@
-import tqdm
+from tqdm import tqdm
 import boto3
 import os
 import io
@@ -21,14 +21,20 @@ class PreProcessTextract:
         self.process_mode = process_mode
         self.img_path = img_path
         self.tag_path = tag_path
-        self.upload_path = upload_path
+        try:
+            response = self.s3client.get_object(Bucket=self.bucket_name, Key=upload_path)['Body'].read()
+            self.target_data = json.loads(response)
+        except botocore.exceptions.ClientError as e:
+            self.target_data = []
         self.s3client = boto3.client('s3',
-                                   aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-                                   aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'])
+                                #    aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+                                #    aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
+                                   )
         self.textractclient = boto3.client('textract',
                                            region_name='ap-south-1',
-                                            aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-                                            aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'])
+                                            # aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+                                            # aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
+                                            )
         self.bucket_name = os.environ['AWS_BUCKET_NAME']
 
         self.processed_data: list = []
@@ -82,6 +88,8 @@ class PreProcessTextract:
                         intersection_area = box1.intersection(box2).area
                         bbox1_area = box1.area
                         bbox2_area = box2.area
+                        if bbox1_area == 0 or bbox2_area == 0:
+                            continue
                         intersection_percentage = (intersection_area / min(bbox1_area , bbox2_area)) * 100
                         if intersection_percentage > 85:
                             if label_dict[k.upper()] == 0:
@@ -99,17 +107,14 @@ class PreProcessTextract:
         ]
 
     def upload_data_to_bucket(self):
-        try:
-            response = self.s3client.get_object(Bucket=self.bucket_name, Key=self.upload_path)['Body'].read()
-            data = json.loads(response)
-        except botocore.exceptions.ClientError as e:
-            data = []
-        data.extend(self.processed_data)
-        self.s3client.put_object(Bucket=self.bucket_name, Key=self.upload_path, Body=json.dumps(data))
+        self.target_data.extend(self.processed_data)
+        self.s3client.put_object(Bucket=self.bucket_name, Key=self.upload_path, Body=json.dumps(self.target_data))
 
     def process(self):
         all_files = self.get_file_list('process')
-        for file in all_files:
+        for file in tqdm(all_files):
+            if file['Key'].split('/')[-1] in self.target_data:
+                continue
             img = self.get_file_from_bucket(file['Key'], 'img')
             tag = self.get_file_from_bucket(file['Key'], 'tag')
             self.process_text(img, tag)
