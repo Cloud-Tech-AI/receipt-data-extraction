@@ -6,6 +6,7 @@ phases:
       python: 3.11
     commands:
     - pip install poetry
+    - poetry config virtualenvs.in-project true
     - poetry install -v
 
   build:
