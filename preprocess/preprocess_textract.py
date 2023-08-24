@@ -41,7 +41,7 @@ class PreProcessTextract:
         self.box_data: list = []
         self.entities_data: list = []
 
-    def get_file_list(self, mode):
+    def get_file_list(self):
         file_list = self.s3client.list_objects(Bucket=self.bucket_name, Prefix=self.img_path)
         file_list = [file for file in file_list['Contents'] if file['Key'].split('.')[-1] == 'jpg']
         return file_list
@@ -110,9 +110,10 @@ class PreProcessTextract:
         self.s3client.put_object(Bucket=self.bucket_name, Key=self.upload_path, Body=json.dumps(self.target_data))
 
     def process(self):
-        all_files = self.get_file_list('process')
+        all_files = self.get_file_list()
+        target_files = [file['imgs'] for file in self.target_data]
         for file in tqdm(all_files):
-            if file['Key'].split('/')[-1] in self.target_data:
+            if file['Key'] in target_files:
                 continue
             img = self.get_file_from_bucket(file['Key'], 'img')
             tag = self.get_file_from_bucket(file['Key'], 'tag')
