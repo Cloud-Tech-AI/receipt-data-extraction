@@ -21,6 +21,7 @@ class PreProcessTextract:
         self.process_mode = process_mode
         self.img_path = img_path
         self.tag_path = tag_path
+        self.upload_path = upload_path
         self.s3client = boto3.client('s3',
                                 #    aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
                                 #    aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
