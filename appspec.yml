@@ -3,15 +3,3 @@ os: linux
 files:
   - source: /
     destination: /home/ubuntu/receipt-data-extraction/
-permissions:
-  - object: /home/ubuntu/receipt-data-extraction/
-    pattern: "**"
-    owner: root
-    group: root
-
-hooks:
-  pre-deploy:
-    commands: []
-
-  post-deploy:
-    commands: []
