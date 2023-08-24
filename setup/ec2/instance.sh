@@ -4,6 +4,21 @@
 sudo apt update
 sudo apt upgrade -y
 
+# Install AWS CLI v2
+curl "https://d1vvhvl2y92vvt.cloudfront.net/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Install the CodeDeploy agent
+sudo apt install -y ruby
+sudo apt install -y wget
+wget https://aws-codedeploy-us-west-2.s3.us-west-2.amazonaws.com/latest/install
+chmod +x ./install
+sudo ./install auto
+
+# Clean up temporary files
+rm -rf awscliv2.zip aws install
+
 # Install General Dependencies
 sudo apt install git -y
 sudo dpkg -S /usr/bin/nohup
