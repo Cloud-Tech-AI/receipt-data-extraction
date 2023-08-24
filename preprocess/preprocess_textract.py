@@ -35,7 +35,7 @@ class PreProcessTextract:
                                             # aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
                                             # aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
                                             )
-        self.bucket_name = os.environ['AWS_BUCKET_NAME']
+        self.bucket_name = 'receipt-extraction-data'
 
         self.processed_data: list = []
         self.word_data: list = []
