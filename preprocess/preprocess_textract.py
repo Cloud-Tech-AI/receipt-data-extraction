@@ -21,11 +21,6 @@ class PreProcessTextract:
         self.process_mode = process_mode
         self.img_path = img_path
         self.tag_path = tag_path
-        try:
-            response = self.s3client.get_object(Bucket=self.bucket_name, Key=upload_path)['Body'].read()
-            self.target_data = json.loads(response)
-        except botocore.exceptions.ClientError as e:
-            self.target_data = []
         self.s3client = boto3.client('s3',
                                 #    aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
                                 #    aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
@@ -36,7 +31,11 @@ class PreProcessTextract:
                                             # aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
                                             )
         self.bucket_name = 'receipt-extraction-data'
-
+        try:
+            response = self.s3client.get_object(Bucket=self.bucket_name, Key=upload_path)['Body'].read()
+            self.target_data = json.loads(response)
+        except botocore.exceptions.ClientError as e:
+            self.target_data = []
         self.processed_data: list = []
         self.word_data: list = []
         self.box_data: list = []
