@@ -8,3 +8,10 @@ permissions:
     pattern: "**"
     owner: root
     group: root
+
+hooks:
+  pre-deploy:
+    commands: []
+
+  post-deploy:
+    commands: []
