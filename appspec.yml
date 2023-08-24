@@ -5,7 +5,7 @@ files:
     destination: /home/ubuntu/receipt-data-extraction/
     file_exists_behavior: OVERWRITE
 permissions:
-  - object: /home/ubuntu/cloud-tech-webapp/
+  - object: /home/ubuntu/receipt-data-extraction/
     pattern: "**"
     owner: root
     group: root
