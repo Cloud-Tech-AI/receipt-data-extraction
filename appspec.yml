@@ -10,7 +10,8 @@ permissions:
     group: root
 
 hooks:
-  BeforeInstall:
-    - location: scripts/deploy.sh
-      timeout: 1200
-      runas: root
+  pre-deploy:
+    commands: []
+
+  post-deploy:
+    commands: []
