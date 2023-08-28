@@ -20,7 +20,7 @@ if "__main__" == __name__:
     arg_parser.add_argument('--artefact_dir', type=str, default=None, help='path to output directory')
     
     arg_parser.add_argument('--device', type=str, default='cuda:0', help='device (CPU, if CUDA not available)')
-    arg_parser.add_argument('--use_large', default=False, action='store_true', help='use layoutlmv2-large-uncased as base model')
+    arg_parser.add_argument('--use_large', action='store_true', help='use layoutlmv2-large-uncased as base model')
     arg_parser.add_argument('--save_all', action='store_true', help='')
 
     arg_parser.add_argument('--batch_size', type=int, default=4, help='batch size')
