@@ -16,6 +16,7 @@ class PreProcessTextract:
                  process_mode: str = 'train',
                  img_path: str = 'raw-data/imgs/',
                  tag_path: str = 'raw-data/tags/',
+                 infer_path: str = 'user-data/imgs/',
                  upload_path: str = 'preprocessed-data-train/processed_data.json'):
 
         self.process_mode = process_mode
@@ -67,11 +68,12 @@ class PreProcessTextract:
         self.word_data = [word['Text'] for word in words]
         self.box_data = [[word['Geometry']['Polygon'][0]['X']*width, word['Geometry']['Polygon'][0]['Y']*height,
                           word['Geometry']['Polygon'][3]['X']*width, word['Geometry']['Polygon'][3]['Y']*height] for word in words]
-        self.entities_data = ['O' for _ in words]
-        self.get_entites_from_bbox(tag)
+        if tag:
+            self.entities_data = ['O' for _ in words]
+            self.get_entites_from_bbox(tag)
         self.box_data = [self.normalize_bbox(bbox, width, height) for bbox in self.box_data]
 
-    def get_entites_from_bbox(self, tag):
+    def get_entites_from_bbox(self, tag=None):
         label_dict = {
             "COMPANY": 0,
             "DATE": 0,
@@ -111,24 +113,32 @@ class PreProcessTextract:
         self.s3client.put_object(Bucket=self.bucket_name, Key=self.upload_path, Body=json.dumps(self.target_data))
 
     def process(self):
-        all_files = self.get_file_list()
-        target_files = [file['imgs'] for file in self.target_data]
-        for file in tqdm(all_files):
-            if file['Key'] in target_files:
-                continue
-            img = self.get_file_from_bucket(file['Key'], 'img')
-            tag = self.get_file_from_bucket(file['Key'], 'tag')
-            self.process_text(img, tag)
+        if self.process_mode == 'train':
+            all_files = self.get_file_list()
+            target_files = [file['imgs'] for file in self.target_data]
+            for file in tqdm(all_files):
+                if file['Key'] in target_files:
+                    continue
+                img = self.get_file_from_bucket(file['Key'], 'img')
+                tag = self.get_file_from_bucket(file['Key'], 'tag')
+                self.process_text(img, tag)
+                self.processed_data.append({
+                    'imgs': file['Key'],
+                    'boxes': self.box_data,
+                    'words': self.word_data,
+                    'labels': self.entities_data
+                })
+                self.box_data = []
+                self.word_data = []
+                self.entities_data = []
+            self.upload_data_to_bucket()
+        else:
+            self.process_text(img)
             self.processed_data.append({
-                'imgs': file['Key'],
+                'imgs': '',
                 'boxes': self.box_data,
                 'words': self.word_data,
-                'labels': self.entities_data
             })
-            self.box_data = []
-            self.word_data = []
-            self.entities_data = []
-        self.upload_data_to_bucket()
 
 if __name__ == "__main__":
     preprocess = PreProcessTextract()

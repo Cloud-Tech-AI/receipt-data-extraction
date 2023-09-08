@@ -39,7 +39,7 @@ poetry init -n
 poetry add mlflow
 poetry add boto3
 source .venv/bin/activate
-nohup mlflow server -h 0.0.0.0 --default-artifact-root s3://receipt-extraction-models &
+nohup mlflow server -h 0.0.0.0 --backend-store-uri postgresql://ishan_mlflow:mlflow_db@localhost:5432/mlflow_db --default-artifact-root s3://receipt-extraction-models/artefacts &
 deactivate
 cd ..
 
@@ -54,3 +54,4 @@ poetry add jellyfish
 poetry add pillow
 poetry add tqdm
 poetry add python-dotenv
+poetry add psycopg2-binary
