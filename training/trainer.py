@@ -1,8 +1,7 @@
-import traceback
 import datetime
-import copy
 import torch
 import numpy as np
+import mlflow
 
 from model import Model
 from mixins import EpochMixin
@@ -15,7 +14,6 @@ class TrainCustomModel:
                  epochs,
                  dropout,
                  save_all,
-                 artefact_dir,
                  clip_grad,
                  early_stopping_patience,
                  ):
@@ -25,7 +23,7 @@ class TrainCustomModel:
         self.early_stopping_patience = early_stopping_patience
         self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
-        model_params = Model(use_large=dataloader.use_large, learning_rate=learning_rate, dropout=dropout, save_all=save_all, artefact_dir=artefact_dir)
+        model_params = Model(use_large=dataloader.use_large, learning_rate=learning_rate, dropout=dropout, save_all=save_all)
         model_params.load_model(self.dataloader.labels)
         self.model_params = model_params
         self.epoch_params = EpochMixin()
@@ -80,23 +78,6 @@ class TrainCustomModel:
             self.epoch_params.batch_labels = torch.cat([self.epoch_params.batch_labels, sub_batch['labels'].detach().cpu()])
             self.epoch_params.batch_attention = torch.cat([self.epoch_params.batch_attention, sub_batch['attention_mask'].detach().cpu()])
         return loss
-
-    def get_model_config(self):
-        config = {
-            "batch_size": self.dataloader.batch_size,
-            "stride": self.dataloader.stride,
-            "max_length": self.dataloader.max_length,
-            "train_fraction": self.dataloader.train_fraction,
-            "use_large": self.dataloader.use_large,
-            "learning_rate": self.model_params.learning_rate,
-            "epochs": self.epochs,
-            "dropout": self.model_params.dropout,
-            "save_all": self.model_params.save_all,
-            "artefact_dir": self.model_params.artefact_dir,
-            "clip_grad": self.clip_grad,
-            "early_stopping_patience": self.early_stopping_patience
-        }
-        return config
     
     def cross_entropy_loss(self, logits, labels, attention_mask, size_average=True):
         logits = logits.view(-1, logits.size(-1))
@@ -201,7 +182,7 @@ class TrainCustomModel:
             if (eval_loss < self.model_params.last_best or eval_score["overall_f1"] > self.model_params.last_best_f1) or (self.model_params.save_all):
                 self.model_params.last_best = min(self.model_params.last_best, eval_loss)
                 self.model_params.last_best_f1 = max(self.model_params.last_best_f1, eval_score["overall_f1"])
-                self.model_params.save_model(epoch, self.get_model_config(), self.dataloader)
+                self.model_params.save_model(epoch, self.dataloader)
 
             self.model_params.scheduler.step(eval_loss)
             if len(self.model_params.eval_losses) > self.early_stopping_patience and min(self.model_params.eval_losses[-1*self.early_stopping_patience:]) > self.model_params.last_best:
@@ -210,8 +191,18 @@ class TrainCustomModel:
 
             print(f"TOTAL EPOCH TIME: {datetime.datetime.now()-self.epoch_params.epoch_time}", flush=True)
             print("#"*40, flush=True)
-            
+        
         self.model_params.end_time = datetime.datetime.now()
         self.model_params.total_time = self.model_params.end_time - self.model_params.start_time
+
+        for k, v in train_score.items(): 
+            mlflow.log_metric(f"train_{k}", v)
+        for k, v in eval_score.items():
+            mlflow.log_metric(f"eval_{k}", v)
+        
+        mlflow.log_metric("train_loss", self.model_params.train_losses[-1])
+        mlflow.log_metric("eval_loss", self.model_params.eval_losses[-1])
+        mlflow.log_metric("training_time", self.model_params.total_time)
+
         print(f"TOTAL TRAINING TIME: {self.model_params.total_time}", flush=True)
         print("="*40, flush=True)

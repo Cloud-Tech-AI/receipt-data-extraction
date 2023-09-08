@@ -1,4 +1,6 @@
+import io
 import json
+import requests
 import numpy as np
 import torch
 from PIL import Image
@@ -29,7 +31,13 @@ class ReceiptDataset(torch.utils.data.Dataset):
         return len(self.annotations)
     
     def process_data(self, data):
-        images = [Image.open(path).convert("RGB") for path in data['imgs']]
+        images = []
+        for path in data['imgs']:
+            if self.bucket_name is None:
+                images.append(Image.open(path).convert("RGB"))
+            else:
+                path = 'S3://{}/{}'.format(self.bucket_name, path)
+                images.append(Image.open(io.BytesIO(requests.get(path).content)).convert("RGB"))
         words = data['words']
         boxes = data['boxes']
         labels = data['labels']

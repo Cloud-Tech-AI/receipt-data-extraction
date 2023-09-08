@@ -3,7 +3,9 @@ import sys
 import json
 import datetime
 import argparse
-import torch
+import tempfile
+import requests
+import mlflow
 
 from dataloader import ReceiptDataLoader
 from trainer import TrainCustomModel
@@ -17,8 +19,8 @@ if "__main__" == __name__:
     
     arg_parser.add_argument('--run_name', type=str, default=None, help='name of the experiment')
     arg_parser.add_argument('--data', type=str, default=None, help='path to data folder')
-    arg_parser.add_argument('--artefact_dir', type=str, default=None, help='path to output directory')
-    
+    arg_parser.add_argument('--bucket_name', type=str, default='', help='bucket name')
+
     arg_parser.add_argument('--device', type=str, default='cuda:0', help='device (CPU, if CUDA not available)')
     arg_parser.add_argument('--use_large', action='store_true', help='use layoutlmv2-large-uncased as base model')
     arg_parser.add_argument('--save_all', action='store_true', help='')
@@ -37,28 +39,32 @@ if "__main__" == __name__:
     print(args._get_kwargs())
 
     if args.run_name is None:
-        args.run_name = 'exp_layoulm'+datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    if args.data is None:
-        raise ValueError('Data path must be specified')
-    if args.artefact_dir is None:
-        os.makedirs(os.path.join('artefacts', args.run_name), exist_ok=True)
-        args.artefact_dir = os.path.join('artefacts', args.run_name)
-    else:
-        os.makedirs(os.path.join(args.artefact_dir,
-                    args.run_name), exist_ok=True)
-        args.artefact_dir = os.path.join(args.artefact_dir, args.run_name)
+        args.run_name = 'exp_layoulm_'+datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if args.data is None:
+            open(os.path.join(temp_dir, "processed_data.json"), "wb").write(requests.get(f'S3://{args.bucket_name}/preprocessed-data-train/processed_data.json').content)
+            args.data = os.path.join(temp_dir, "processed_data.json")
+        sys.stdout = open(os.path.join(temp_dir, "layoutlm_out.log"), "a")
+        sys.stderr = open(os.path.join(temp_dir, "layoutlm_err.log"), "a")
+        
+        mlflow.set_experiment('exp_layoutlm')
+        with mlflow.start_run(run_name=args.run_name) as run:
+            mlflow.log_params(args._get_kwargs())
 
-    # sys.stdout = open(os.path.join(args.artefact_dir, "layoutlm_log.log"), "a")
-    # sys.stderr = open(os.path.join(args.artefact_dir, "layoutlm_err.log"), "a")
+            dataloader = ReceiptDataLoader(
+                args.data, args.batch_size, args.stride, args.max_length, args.train_fraction, args.use_large)
+            
+            open(os.path.join(temp_dir, "train_annotation.json"),
+                "w").write(json.dumps(dataloader.train_annotations))
+            open(os.path.join(temp_dir, "test_annotation.json"),
+                "w").write(json.dumps(dataloader.test_annotations))
 
-    dataloader = ReceiptDataLoader(
-        args.data, args.batch_size, args.stride, args.max_length, args.train_fraction, args.use_large)
+            trainer = TrainCustomModel(dataloader, args.lr, args.epochs, args.dropout,
+                                    args.save_all, args.clip_grad, args.early_stopping_patience)
+            trainer.train()
 
-    open(os.path.join(args.artefact_dir, "train_annotation.json"),
-         "w").write(json.dumps(dataloader.train_annotations))
-    open(os.path.join(args.artefact_dir, "test_annotation.json"),
-         "w").write(json.dumps(dataloader.test_annotations))
-
-    trainer = TrainCustomModel(dataloader, args.lr, args.epochs, args.dropout,
-                               args.save_all, args.artefact_dir, args.clip_grad, args.early_stopping_patience)
-    trainer.train()
+            mlflow.log_artifact(os.path.join(temp_dir, "train_annotation.json"))
+            mlflow.log_artifact(os.path.join(temp_dir, "test_annotation.json"))
+            mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_out.log"))
+            mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_err.log"))
