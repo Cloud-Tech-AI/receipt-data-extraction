@@ -3,6 +3,7 @@ import json
 import requests
 import numpy as np
 import torch
+import boto3
 from PIL import Image
 
 from model import Processor
@@ -16,6 +17,7 @@ class ReceiptDataset(torch.utils.data.Dataset):
                  id2label,
                  use_large,
                  max_length,
+                 bucket_name,
                  split_name):
         self.annotations = annotations
         self.stride = stride
@@ -23,6 +25,8 @@ class ReceiptDataset(torch.utils.data.Dataset):
         self.id2label = id2label
         self.split_name = split_name
         self.max_length = max_length
+        self.bucket_name = bucket_name
+        self.s3client = boto3.client('s3')
         processor = Processor(use_large=use_large)
         processor.load_processor()
         self.processor = processor.processor
@@ -36,8 +40,7 @@ class ReceiptDataset(torch.utils.data.Dataset):
             if self.bucket_name is None:
                 images.append(Image.open(path).convert("RGB"))
             else:
-                path = 'S3://{}/{}'.format(self.bucket_name, path)
-                images.append(Image.open(io.BytesIO(requests.get(path).content)).convert("RGB"))
+                images.append(Image.open(io.BytesIO(self.s3client.get_object(Bucket=self.bucket_name, Key=path)['Body'].read())).convert("RGB"))
         words = data['words']
         boxes = data['boxes']
         labels = data['labels']
@@ -94,6 +97,7 @@ class ReceiptDataLoader:
                  batch_size,
                  stride,
                  max_length,
+                 bucket_name,
                  train_fraction,
                  use_large
                  ):
@@ -102,13 +106,21 @@ class ReceiptDataLoader:
         self.max_length = max_length
         self.train_fraction = train_fraction
         self.use_large = use_large
-        self.annotations = json.loads(open(data_path, "r").read())
+        self.s3client = boto3.client('s3')
+        self.bucket_name = bucket_name
+        self.load_data(data_path)
         self.labels = self.get_unique_labels()
         self.label2id = {v: k for k, v in enumerate(self.labels)}
         self.id2label = {k: v for k, v in enumerate(self.labels)}
         self.train_annotations, self.test_annotations = self.get_train_test_split()
         self.train_dataset, self.test_dataset = self.get_dataset()
         self.train_dataloader, self.test_dataloader = self.get_dataloader()
+
+    def load_data(self, data_path):
+        if data_path is None:
+            self.annotations = self.s3client.get_object(Bucket=self.bucket_name, Key='preprocessed-data-train/processed_data.json')['Body'].read() 
+        else:
+            self.annotations = json.loads(open(data_path, "r").read())
 
     def get_unique_labels(self):
         labels = []
@@ -140,6 +152,7 @@ class ReceiptDataLoader:
                                         self.id2label,
                                         self.use_large,
                                         self.max_length,
+                                        self.bucket_name,
                                         split_name='train')
         test_dataset = ReceiptDataset(self.test_annotations,
                                     self.stride,
@@ -147,6 +160,7 @@ class ReceiptDataLoader:
                                     self.id2label,
                                     self.use_large,
                                     self.max_length,
+                                    self.bucket_name,
                                     split_name='val')
         return train_dataset, test_dataset
     
