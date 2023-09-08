@@ -4,7 +4,6 @@ import json
 import datetime
 import argparse
 import tempfile
-import requests
 import mlflow
 
 from dataloader import ReceiptDataLoader
@@ -19,7 +18,7 @@ if "__main__" == __name__:
     
     arg_parser.add_argument('--run_name', type=str, default=None, help='name of the experiment')
     arg_parser.add_argument('--data', type=str, default=None, help='path to data folder')
-    arg_parser.add_argument('--bucket_name', type=str, default='', help='bucket name')
+    arg_parser.add_argument('--bucket_name', type=str, default=None, help='bucket name')
 
     arg_parser.add_argument('--device', type=str, default='cuda:0', help='device (CPU, if CUDA not available)')
     arg_parser.add_argument('--use_large', action='store_true', help='use layoutlmv2-large-uncased as base model')
@@ -40,11 +39,10 @@ if "__main__" == __name__:
 
     if args.run_name is None:
         args.run_name = 'exp_layoulm_'+datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if args.data is None and args.bucket_name is None:
+        raise ValueError('Either data or bucket_name should be provided')
     
     with tempfile.TemporaryDirectory() as temp_dir:
-        if args.data is None:
-            open(os.path.join(temp_dir, "processed_data.json"), "wb").write(requests.get(f'S3://{args.bucket_name}/preprocessed-data-train/processed_data.json').content)
-            args.data = os.path.join(temp_dir, "processed_data.json")
         sys.stdout = open(os.path.join(temp_dir, "layoutlm_out.log"), "a")
         sys.stderr = open(os.path.join(temp_dir, "layoutlm_err.log"), "a")
         
@@ -53,7 +51,7 @@ if "__main__" == __name__:
             mlflow.log_params(args._get_kwargs())
 
             dataloader = ReceiptDataLoader(
-                args.data, args.batch_size, args.stride, args.max_length, args.train_fraction, args.use_large)
+                args.data, args.batch_size, args.stride, args.max_length, args.bucket_name, args.train_fraction, args.use_large)
             
             open(os.path.join(temp_dir, "train_annotation.json"),
                 "w").write(json.dumps(dataloader.train_annotations))
