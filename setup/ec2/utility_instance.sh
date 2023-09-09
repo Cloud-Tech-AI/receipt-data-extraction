@@ -26,10 +26,10 @@ sudo dpkg -S /usr/bin/nohup
 # Install Python 3.11
 sudo apt install python3.11 -y
 sudo apt install python3-pip -y
-sudo pip install --upgrade pip
+pip install --upgrade pip
 
 # Install the required Python packages
-sudo pip install poetry
+pip install poetry
 poetry config virtualenvs.in-project true
 
 # Start the mlflow server

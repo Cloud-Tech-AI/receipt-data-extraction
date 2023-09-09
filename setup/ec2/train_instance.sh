@@ -8,13 +8,12 @@ sudo apt upgrade -y
 sudo apt install git -y
 sudo dpkg -S /usr/bin/nohup
 
-# Install Python 3.11
-sudo apt install python3.11 -y
-sudo apt install python3-pip -y
-sudo pip install --upgrade pip
+# Upgrade pip
+pip install --upgrade pip
+pip install --upgrade setuptools
 
 # Install the required Python packages
-sudo pip install poetry
+pip install poetry
 poetry config virtualenvs.in-project true
 
 # Clone the repository

@@ -118,7 +118,7 @@ class ReceiptDataLoader:
 
     def load_data(self, data_path):
         if data_path is None:
-            self.annotations = self.s3client.get_object(Bucket=self.bucket_name, Key='preprocessed-data-train/processed_data.json')['Body'].read() 
+            self.annotations = json.loads(self.s3client.get_object(Bucket=self.bucket_name, Key='preprocessed-data-train/processed_data.json')['Body'].read())
         else:
             self.annotations = json.loads(open(data_path, "r").read())
 
