@@ -35,7 +35,7 @@ if "__main__" == __name__:
     arg_parser.add_argument('--early_stopping_patience', type=int, default=15, help='No of epochs to wait after min loss/max f1 score')
     
     args = arg_parser.parse_args()
-    print(args._get_kwargs())
+    logging.info(args._get_kwargs())
 
     if args.run_name is None:
         args.run_name = 'exp_layoulm_'+datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -46,21 +46,29 @@ if "__main__" == __name__:
         sys.stdout = open(os.path.join(temp_dir, "layoutlm_out.log"), "a")
         sys.stderr = open(os.path.join(temp_dir, "layoutlm_err.log"), "a")
         
+        logging.info('Starting experiment')
+
         mlflow.set_experiment('exp_layoutlm')
         with mlflow.start_run(run_name=args.run_name) as run:
-            mlflow.log_params(args._get_kwargs())
+            mlflow.log_params(dict(args._get_kwargs()))
+            
+            logging.info('Params logged')
 
             dataloader = ReceiptDataLoader(
                 args.data, args.batch_size, args.stride, args.max_length, args.bucket_name, args.train_fraction, args.use_large)
-            
+
             open(os.path.join(temp_dir, "train_annotation.json"),
                 "w").write(json.dumps(dataloader.train_annotations))
             open(os.path.join(temp_dir, "test_annotation.json"),
                 "w").write(json.dumps(dataloader.test_annotations))
 
+            logging.info('Data loaded')
+
             trainer = TrainCustomModel(dataloader, args.lr, args.epochs, args.dropout,
                                     args.save_all, args.clip_grad, args.early_stopping_patience)
             trainer.train()
+
+            logging.info('Training done')
 
             mlflow.log_artifact(os.path.join(temp_dir, "train_annotation.json"))
             mlflow.log_artifact(os.path.join(temp_dir, "test_annotation.json"))
