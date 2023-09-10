@@ -44,15 +44,14 @@ if "__main__" == __name__:
         raise ValueError('Either data or bucket_name should be provided')
     
     with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-    
-            sys.stdout = open(os.path.join(temp_dir, "layoutlm_out.log"), "a")
-            sys.stderr = open(os.path.join(temp_dir, "layoutlm_err.log"), "a")
-            
-            logging.info('Starting experiment')
-
-            mlflow.set_experiment('exp_layoutlm')
-            with mlflow.start_run(run_name=args.run_name) as run:
+        sys.stdout = open(os.path.join(temp_dir, "layoutlm_out.log"), "a")
+        sys.stderr = open(os.path.join(temp_dir, "layoutlm_err.log"), "a")
+        
+        logging.info('Starting experiment')
+        
+        mlflow.set_experiment('exp_layoutlm')
+        with mlflow.start_run(run_name=args.run_name) as run:
+            try:
                 mlflow.log_params(dict(args._get_kwargs()))
                 
                 logging.info('Params logged')
@@ -78,8 +77,8 @@ if "__main__" == __name__:
 
                 mlflow.log_artifact(os.path.join(temp_dir, "train_annotation.json"))
                 mlflow.log_artifact(os.path.join(temp_dir, "test_annotation.json"))
-        except:
-            traceback.print_exc()
+            except:
+                traceback.print_exc()
     
-        mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_out.log"))
-        mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_err.log"))
+            mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_out.log"))
+            mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_err.log"))
