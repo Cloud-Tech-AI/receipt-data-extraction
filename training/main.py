@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import datetime
+import traceback
 import argparse
 import tempfile
 import mlflow
@@ -43,34 +44,42 @@ if "__main__" == __name__:
         raise ValueError('Either data or bucket_name should be provided')
     
     with tempfile.TemporaryDirectory() as temp_dir:
-        sys.stdout = open(os.path.join(temp_dir, "layoutlm_out.log"), "a")
-        sys.stderr = open(os.path.join(temp_dir, "layoutlm_err.log"), "a")
-        
-        logging.info('Starting experiment')
-
-        mlflow.set_experiment('exp_layoutlm')
-        with mlflow.start_run(run_name=args.run_name) as run:
-            mlflow.log_params(dict(args._get_kwargs()))
+        try:
+    
+            sys.stdout = open(os.path.join(temp_dir, "layoutlm_out.log"), "a")
+            sys.stderr = open(os.path.join(temp_dir, "layoutlm_err.log"), "a")
             
-            logging.info('Params logged')
+            logging.info('Starting experiment')
 
-            dataloader = ReceiptDataLoader(
-                args.data, args.batch_size, args.stride, args.max_length, args.bucket_name, args.train_fraction, args.use_large)
+            mlflow.set_experiment('exp_layoutlm')
+            with mlflow.start_run(run_name=args.run_name) as run:
+                mlflow.log_params(dict(args._get_kwargs()))
+                
+                logging.info('Params logged')
 
-            open(os.path.join(temp_dir, "train_annotation.json"),
-                "w").write(json.dumps(dataloader.train_annotations))
-            open(os.path.join(temp_dir, "test_annotation.json"),
-                "w").write(json.dumps(dataloader.test_annotations))
+                dataloader = ReceiptDataLoader(
+                    args.data, args.batch_size, args.stride, args.max_length, args.bucket_name, args.train_fraction, args.use_large)
 
-            logging.info('Data loaded')
+                open(os.path.join(temp_dir, "train_annotation.json"),
+                    "w").write(json.dumps(dataloader.train_annotations))
+                open(os.path.join(temp_dir, "test_annotation.json"),
+                    "w").write(json.dumps(dataloader.test_annotations))
 
-            trainer = TrainCustomModel(dataloader, args.lr, args.epochs, args.dropout,
-                                    args.save_all, args.clip_grad, args.early_stopping_patience)
-            trainer.train()
+                logging.info('Data loaded')
 
-            logging.info('Training done')
+                trainer = TrainCustomModel(dataloader, args.lr, args.epochs, args.dropout,
+                                        args.save_all, args.clip_grad, args.early_stopping_patience)
+                
+                logging.info('Model loaded')
 
-            mlflow.log_artifact(os.path.join(temp_dir, "train_annotation.json"))
-            mlflow.log_artifact(os.path.join(temp_dir, "test_annotation.json"))
-            mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_out.log"))
-            mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_err.log"))
+                trainer.train()
+
+                logging.info('Training done')
+
+                mlflow.log_artifact(os.path.join(temp_dir, "train_annotation.json"))
+                mlflow.log_artifact(os.path.join(temp_dir, "test_annotation.json"))
+        except:
+            traceback.print_exc()
+    
+        mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_out.log"))
+        mlflow.log_artifact(os.path.join(temp_dir, "layoutlm_err.log"))
