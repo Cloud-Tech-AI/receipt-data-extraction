@@ -23,13 +23,12 @@ rm -rf awscliv2.zip aws install
 sudo apt install git -y
 sudo dpkg -S /usr/bin/nohup
 
-# Install Python 3.11
-sudo apt install python3.11 -y
+# Install Pip
 sudo apt install python3-pip -y
-pip install --upgrade pip
+sudo pip install --upgrade pip
 
 # Install the required Python packages
-pip install poetry
+sudo pip install poetry
 poetry config virtualenvs.in-project true
 
 # Start the mlflow server
