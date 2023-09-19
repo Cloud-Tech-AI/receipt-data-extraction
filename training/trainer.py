@@ -3,6 +3,8 @@ import torch
 import numpy as np
 import mlflow
 
+import logging
+
 from model import Model
 from mixins import EpochMixin
 
@@ -45,38 +47,42 @@ class TrainCustomModel:
     def handle_batch_overflow(self, batch):
         loss = None
         sub_batches = self.get_sub_batches(batch)
+        logging.info(f"Number of sub batches: {len(sub_batches)}")
+        gpu_memory = torch.cuda.memory_allocated() / (1024 ** 2)  # in MB
+        logging.info(f"GPU Memory Usage: {gpu_memory:.2f} MB")
         for sub_batch in sub_batches:
             for k, v in sub_batch.items():
-                # remove unwanted index
                 if k in ["idx"]:
                     continue
-                # put on device
                 sub_batch[k] = v.to(self.device)
             del sub_batch["idx"]
-            # del _temp
-            # forward + backward + optimize
-            # sub_batch = torch.tensor(**sub_batch).to(torch.long64)
+            
             try:
                 outputs = self.model_params.model(**sub_batch)
             except Exception as e:
-                raise
+                logging.info(f"Exception: {e}")
+                logging.info("#"*40)
 
             if loss is None:
                 loss = self.cross_entropy_loss(
                     logits=outputs.logits,
-                    labels=sub_batch['labels'].detach(),
-                    attention_mask=sub_batch['attention_mask'].detach()
+                    labels=sub_batch['labels'],
+                    attention_mask=sub_batch['attention_mask']
                 )
             else:
                 loss += self.cross_entropy_loss(
                     logits=outputs.logits,
-                    labels=sub_batch['labels'].detach(),
-                    attention_mask=sub_batch['attention_mask'].detach()
+                    labels=sub_batch['labels'],
+                    attention_mask=sub_batch['attention_mask']
                 )
             
-            self.epoch_params.batch_predictions = torch.cat([self.epoch_params.batch_predictions, outputs.logits.detach().cpu()])
-            self.epoch_params.batch_labels = torch.cat([self.epoch_params.batch_labels, sub_batch['labels'].detach().cpu()])
-            self.epoch_params.batch_attention = torch.cat([self.epoch_params.batch_attention, sub_batch['attention_mask'].detach().cpu()])
+            logits = outputs.logits.detach().cpu()
+            for k, v in sub_batch.items():
+                sub_batch[k] = v.detach().cpu()
+
+            self.epoch_params.batch_predictions = torch.cat([self.epoch_params.batch_predictions, logits])
+            self.epoch_params.batch_labels = torch.cat([self.epoch_params.batch_labels, sub_batch['labels']])
+            self.epoch_params.batch_attention = torch.cat([self.epoch_params.batch_attention, sub_batch['attention_mask']])
         return loss
     
     def cross_entropy_loss(self, logits, labels, attention_mask, size_average=True):

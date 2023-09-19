@@ -39,7 +39,7 @@ python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
 
 # Install NVIDIA drivers (nvidia-driver-535 + CUDA 12.2--->latest)
 sudo apt autoremove nvidia* --purge
-sudo apt install nvidia-driver-535
+sudo apt install nvidia-driver-535 -y
 reboot
 nvidia-smi
 
