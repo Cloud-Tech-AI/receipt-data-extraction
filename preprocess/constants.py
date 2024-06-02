@@ -1,0 +1,1 @@
+LABEL_DICT = {"COMPANY": 0, "DATE": 0, "ADDRESS": 0, "TOTAL": 0}
