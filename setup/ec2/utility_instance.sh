@@ -47,8 +47,6 @@ git clone https://github.com/Cloud-Tech-AI/receipt-data-extraction.git
 cd receipt-data-extraction/preprocess
 poetry init -n
 poetry add boto3
-poetry add opencv-python
-poetry add shapely
 poetry add jellyfish
 poetry add pillow
 poetry add tqdm

@@ -1,153 +1,193 @@
 import os
 import json
+from dataclasses import dataclass, field
+from typing import List
+from copy import deepcopy
+
 from PIL import Image
 from tqdm import tqdm
 import jellyfish
+from dotenv import load_dotenv
 
-from collections import defaultdict
+from data_models import Word, Bbox
+from constants import LABEL_DICT
 
 
-class PreprocessorSROIE():
-    def __init__(self,
-                 process_mode: str = 'train',
-                 img_path: str = 'img/',
-                 entities_path: str = 'entities/',
-                 box_path: str = 'box/'):
+load_dotenv()
 
-        self.process_mode = process_mode
-        self.img_path = img_path
-        self.entities_path = entities_path
-        self.box_path = box_path
 
-        self.processed_data: list = []
-        self.word_data: list = []
-        self.box_data: list = []
-        self.entities_data: list = []
+@dataclass
+class PreprocessorSROIE:
+    """Transform SROIE dataset into a format suitable for training a model."""
 
-        if self.process_mode == 'train':
-            self.base_path = '/home/ishan/vscode-workspace/receipt-data-extraction/data/train/'
+    process_mode: str = "train"
+    img_path: str = "img/"
+    entities_path: str = "entities/"
+    box_path: str = "box/"
+    processed_data: list = field(default_factory=list)
+    processed_data: list = field(default_factory=list)
+    word_data: list = field(default_factory=list)
+    box_data: list = field(default_factory=list)
+    entities_data: list = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.process_mode == "train":
+            self.base_path = f"{os.environ['BASE_DATA_PATH']}/train/"
         else:
-            self.base_path = '/home/ishan/vscode-workspace/receipt-data-extraction/data/test/'
+            self.base_path = f"{os.environ['BASE_DATA_PATH']}/test/"
 
         self.base_files = []
-        assert len(os.listdir(self.base_path+self.img_path)) == len(os.listdir(
-            self.base_path+self.entities_path)) == len(os.listdir(self.base_path+self.box_path))
-        for file in os.listdir(self.base_path+self.img_path):
-            self.base_files.append(file.split('.')[0])
+        assert (
+            len(os.listdir(self.base_path + self.img_path))
+            == len(os.listdir(self.base_path + self.entities_path))
+            == len(os.listdir(self.base_path + self.box_path))
+        )
+        for file in os.listdir(self.base_path + self.img_path):
+            self.base_files.append(file.split(".")[0])
 
-    def normalize_bbox(self, bbox, width, height):
-        return [
-            int(1000 * (bbox[0] / width)),
-            int(1000 * (bbox[1] / height)),
-            int(1000 * (bbox[2] / width)),
-            int(1000 * (bbox[3] / height)),
-        ]
+    def process_box(self, path: str, width: int) -> List[List[Word]]:
+        """Split bounding box coordinates for each word
 
-    def process_box(self, path, width):
-        # Split Bounding box coordinates for each word
-        data = open(path, 'r').readlines()
+        Args:
+            path (str): path to the file containing bounding box coordinates
+            width (int): width of the image from corresponding image file
+
+        Returns:
+            List: List of Lines, each line containing a list of words with their bounding box coordinates
+        """
+        data = open(path, "r").readlines()
         lines = []
         for line in data:
-            line = line.strip('\n').strip().split(',')
+            line = line.strip("\n").strip().split(",")
             text = ",".join(line[8:])
 
-            per_word_width = (int(line[4]) - int(line[0]))/len(text)
-            words = text.split(' ')
-            word_pointer = int(line[0])
+            line_word = Word(
+                Bbox(int(line[0]), int(line[1]), int(line[4]), int(line[7])), text
+            )
+            per_char_width = (line_word.bbox.xmax - line_word.bbox.xmin) / len(text)
+
+            words = text.split(" ")
+            word_pointer = line_word.bbox.xmin
             line_words = []
+
             for word in words:
-                new_pointer = per_word_width*len(word)+per_word_width
-                line_words.append([
-                    [
-                        word_pointer,
-                        int(line[1]),
-                        word_pointer+new_pointer if word_pointer+new_pointer < width else width,
-                        int(line[7])
-                    ],
-                    word,
-                    "O"
-                ])
-                word_pointer = word_pointer+new_pointer if word_pointer + \
-                    new_pointer < width else width
+                new_pointer = per_char_width * len(word) + per_char_width
+                line_words.append(
+                    Word(
+                        Bbox(
+                            word_pointer,
+                            line_word.bbox.ymin,
+                            (
+                                word_pointer + new_pointer
+                                if word_pointer + new_pointer < width
+                                else width
+                            ),
+                            line_word.bbox.ymax,
+                        ),
+                        word,
+                        "O",
+                    )
+                )
+                word_pointer = (
+                    word_pointer + new_pointer
+                    if word_pointer + new_pointer < width
+                    else width
+                )
             lines.append(line_words)
         return lines
 
-    def process_entities(self, path, lines):
-        # Add bounding box coordinates to entities
-        data = json.loads(open(path, 'r').read())
+    def process_entities(self, path: str, lines: List[List[Word]]) -> None:
+        """Add bounding box coordinates to entities
+
+        Args:
+            path (str): path to the file containing entities
+            lines (List[List[Word]]): List of Lines, each line containing a list of words with their bounding box coordinates
+        """
+        data = json.loads(open(path, "r").read())
         for k, v in data.items():
             for line in lines:
-                text = " ".join([word[1] for word in line])
+                text = " ".join([word.text for word in line])
                 if k.upper() == "ADDRESS":
                     if text in v and len(line) > 2:
                         for word in line:
-                            word[2] = k.upper()
+                            word.label = k.upper()
                 elif k.upper() == "COMPANY":
-                    distance = jellyfish.jaro_distance(text, v)
-                    if distance > 0.8 and len(line) > 2:
+                    similarity = jellyfish.jaro_similarity(text, v)
+                    if similarity < 0.8 and len(line) > 2:
                         for word in line:
-                            if word[1] in v:
-                                word[2] = k.upper()
+                            if word.text in v:
+                                word.label = k.upper()
                 else:
-                    distance = jellyfish.jaro_distance(text, v)
-                    if distance > 0.8:
+                    similarity = jellyfish.jaro_similarity(text, v)
+                    if similarity < 0.8:
                         for word in line:
-                            if word[1] in v:
-                                word[2] = k.upper()
+                            if word.text in v:
+                                word.label = k.upper()
 
-    def get_processed_data(self, lines, width, height):
-        label_dict = {
-            "COMPANY": 0,
-            "DATE": 0,
-            "ADDRESS": 0,
-            "TOTAL": 0
-        }
+    def get_processed_data(self, width: int, height: int, lines: List[List[Word]]):
+        """Get processed data for each image
+        - Add bounding box coordinates to processed data
+        - Add words to processed data
+        - Add labels to processed data (along with B- and I- prefixes)
+
+        Args:
+            width (int): width of the image from corresponding image file
+            height (int): height of the image from corresponding image file
+            lines (List[List[Word]]): List of Lines, each line containing a list of words with their bounding box coordinates
+        """
+        label_dict = deepcopy(LABEL_DICT)
         for line in lines:
-            line = sorted(line, key=lambda x: x[0][0])
+            line = sorted(line, key=lambda x: x.bbox.xmin)
             for word in line:
-                self.box_data.append(
-                    self.normalize_bbox(word[0], width, height))
-                self.word_data.append(word[1])
-                if word[2] in label_dict:
-                    if label_dict[word[2]] == 0:
-                        self.entities_data.append("B-"+word[2])
-                        label_dict[word[2]] = 1
+                self.box_data.append(word.bbox.normalize_bbox(width, height).to_list())
+                self.word_data.append(word.text)
+                if word.label in label_dict:
+                    if label_dict[word.label] == 0:
+                        self.entities_data.append("B-" + word.label)
+                        label_dict[word.label] = 1
                     else:
-                        self.entities_data.append("I-"+word[2])
+                        self.entities_data.append("I-" + word.label)
                 else:
                     self.entities_data.append("O")
 
     def process(self):
+        """PreProcess all images in the dataset"""
         for file in tqdm(self.base_files):
-            img_path = self.base_path+self.img_path+file+'.jpg'
-            image = Image.open(img_path).convert('RGB')
+            img_path = self.base_path + self.img_path + file + ".jpg"
+            image = Image.open(img_path).convert("RGB")
             width, height = image.size
             lines = self.process_box(
-                self.base_path+self.box_path+file+'.txt', width)
+                self.base_path + self.box_path + file + ".txt", width
+            )
             self.process_entities(
-                self.base_path+self.entities_path+file+'.txt', lines)
-            self.get_processed_data(lines, width, height)
-            if self.process_mode == 'train':
-                self.processed_data.append({
-                    'imgs': img_path,
-                    'boxes': self.box_data,
-                    'words': self.word_data,
-                    'labels': self.entities_data
-                })
+                self.base_path + self.entities_path + file + ".txt", lines
+            )
+            self.get_processed_data(width, height, lines)
+            if self.process_mode == "train":
+                self.processed_data.append(
+                    {
+                        "imgs": img_path,
+                        "boxes": self.box_data,
+                        "words": self.word_data,
+                        "labels": self.entities_data,
+                    }
+                )
             else:
-                self.processed_data.append({
-                    'imgs': img_path,
-                    'boxes': self.box_data,
-                    'words': self.word_data,
-                })
+                self.processed_data.append(
+                    {
+                        "imgs": img_path,
+                        "boxes": self.box_data,
+                        "words": self.word_data,
+                    }
+                )
             self.box_data = []
             self.word_data = []
             self.entities_data = []
-        open('processed_data.json', 'w').write(json.dumps(self.processed_data))
+
         return self.processed_data
 
 
 if __name__ == "__main__":
     preprocessor = PreprocessorSROIE()
-    preprocessor.process()
-    print("Done!")
+    processed_data = preprocessor.process()
+    open("../data/processed_data.json", "w").write(json.dumps(processed_data))
